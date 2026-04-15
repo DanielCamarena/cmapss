@@ -16,7 +16,6 @@ Proyecto base para pronóstico de vida útil remanente (RUL) con el dataset NASA
 1. Modelo de pronóstico
 2. Agente
 3. Dashboard
-4. Escalabilidad
 
 ## Notas
 

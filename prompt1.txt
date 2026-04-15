@@ -1,11 +1,23 @@
 # Guía
 
-## Bosquejo de proyecto
+Se va a desarrollar algo como una aplicación donde se podrá ingresar datos del motor (sensores o archivos), y el sistema analizará esa información usando inteligencia artificial.
+Primero se deberá entrenar un modelo con el dataset de la NASA para que aprenda cómo se degrada un motor en el tiempo.
+Luego, ese modelo podrá estimar cuánto tiempo de vida útil le queda (RUL), identificar el nivel de riesgo y dar una recomendación de mantenimiento.
+Finalmente, todo esto se integra en un dashboard o app interactiva donde se podrán ingresar datos y obtener el resultado de forma automática y visual.
+El proyecto tendría lo siguiente:
+Preparación y análisis del dataset
+Desarrollo del modelo predictivo
+Lógica de riesgo y recomendaciones
+Creación del dashboard/app
+Presentación final
+Escalabilidad y Rueda
+Documento/paper de cómo se realizó paso a paso
+
+## Bosquejo de aplicación
 
 Capa 1: Modelo de pronóstico
 Capa 2: Agente
 Capa 3: Dashboard
-Capa 4: Escalabilidad - Rueda
 
 ## Modelo de pronóstico
 
@@ -27,5 +39,4 @@ Etapa 2:
 Etapa 1:
 Etapa 2:
 
-## Escalabilidad - Rueda
 
