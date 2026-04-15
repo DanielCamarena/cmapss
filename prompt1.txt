@@ -1,0 +1,31 @@
+# Guía
+
+## Bosquejo de proyecto
+
+Capa 1: Modelo de pronóstico
+Capa 2: Agente
+Capa 3: Dashboard
+Capa 4: Escalabilidad - Rueda
+
+## Modelo de pronóstico
+
+Etapa 1A: Exploración de datos
+Etapa 1B: Exploración de documentos
+
+Etapa 2A: Modelo red neuronal puro
+Etapa 2B: Modelo PINN
+
+Etapa 3: Selección de modelos
+
+## Agente
+
+Etapa 1:
+Etapa 2: 
+
+## Dashboard
+
+Etapa 1:
+Etapa 2:
+
+## Escalabilidad - Rueda
+
