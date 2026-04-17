@@ -1,0 +1,16 @@
+name: cmapss
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - numpy
+  - pandas
+  - scipy
+  - matplotlib
+  - scikit-learn
+  - joblib
+  - openpyxl
+  - pyarrow
+  - streamlit
+  - plotly
+  - pip

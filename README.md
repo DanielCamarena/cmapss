@@ -68,10 +68,19 @@ Dependencias usadas en el proyecto (capas 1, 2 y 3):
 
 ## Setup rapido
 
+Opcion recomendada (entorno completo reproducible):
+
+```powershell
+conda env create -f environment.yml
+conda activate cmapss
+```
+
+Opcion manual:
+
 ```powershell
 conda create -n cmapss python=3.11 -y
 conda activate cmapss
-conda install -y -c conda-forge numpy pandas scipy matplotlib scikit-learn joblib openpyxl
+conda install -y -c conda-forge numpy pandas scipy matplotlib scikit-learn joblib openpyxl pyarrow streamlit plotly
 pip install -r requirements.txt
 ```
 
@@ -82,8 +91,8 @@ python -c "import numpy,pandas,scipy,matplotlib,sklearn,joblib,openpyxl,streamli
 ```
 
 Nota sobre `requirements.txt`:
-- `requirements.txt` esta orientado principalmente al dashboard (`streamlit`, `pandas`, `plotly`).
-- Para ejecutar planes de EDA/modelado/agentes se requiere tambien instalar el stack cientifico con conda (comando anterior).
+- `requirements.txt` cubre runtime del dashboard final (incluye `scikit-learn` y `joblib` para inferencia).
+- Para ejecutar todo el pipeline (EDA, entrenamiento, evaluacion), usa `environment.yml` o instala el stack cientifico completo con conda.
 
 ## Ejecucion por planes
 
