@@ -21,7 +21,9 @@ dist/
 *.egg-info/
 
 # Outputs and generated assets
-out/
+out/*
+!out/excel/
+!out/excel/*.xlsx
 fig/
 
 # OS / editor

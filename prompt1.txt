@@ -40,3 +40,7 @@ Etapa 1:
 Etapa 2:
 
 
+## AAA
+
+conda install -y -c conda-forge numpy pandas scipy matplotlib openpyxl
+pip install streamlit
