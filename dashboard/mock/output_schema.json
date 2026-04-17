@@ -1,0 +1,40 @@
+{
+  "schema_version": "1.0.0",
+  "description": "Output payload for mock RUL prediction service",
+  "required_fields": [
+    "rul_pred",
+    "risk_level",
+    "confidence_band",
+    "recommendation_text",
+    "model_version",
+    "timestamp"
+  ],
+  "fields": {
+    "rul_pred": {
+      "type": "number",
+      "min": 0
+    },
+    "risk_level": {
+      "type": "string",
+      "allowed_values": ["healthy", "warning", "critical"]
+    },
+    "confidence_band": {
+      "type": "object",
+      "required_fields": ["low", "high"],
+      "fields": {
+        "low": { "type": "number", "min": 0 },
+        "high": { "type": "number", "min": 0 }
+      }
+    },
+    "recommendation_text": {
+      "type": "string"
+    },
+    "model_version": {
+      "type": "string"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "iso-8601"
+    }
+  }
+}

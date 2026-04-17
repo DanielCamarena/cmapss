@@ -13,3 +13,8 @@ Etapa 3: Selección de modelos
 
 Plantea un plan de trabajo para explorar los datos, deja todo en un archivo de texto para ejecutarlo luego. Explica por aquí un resumen de dicho plan.
 
+Plantea un plan de trabajo para explorar los documentos y referencias, y plantear la capa de pronostico de RUL (modelo predictivos) dentro de mi aplicación. Deja todo en un archivo de texto para ejecutarlo luego. Explica por aquí un resumen de dicho plan.
+
+Plantea un plan de trabajo para el desarrollo de la capa de pronostico de RUL, es decir para implementar los modelos predictivos. Deja todo en un archivo de texto para ejecutarlo luego. Explica por aquí un resumen de dicho plan.
+
+

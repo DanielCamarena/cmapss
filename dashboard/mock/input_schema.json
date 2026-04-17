@@ -1,0 +1,45 @@
+{
+  "schema_version": "1.0.0",
+  "description": "Input payload for mock RUL prediction service",
+  "required_fields": [
+    "dataset_id",
+    "unit_id",
+    "cycle",
+    "op_settings",
+    "sensors",
+    "source"
+  ],
+  "fields": {
+    "dataset_id": {
+      "type": "string",
+      "allowed_values": ["FD001", "FD002", "FD003", "FD004"]
+    },
+    "unit_id": {
+      "type": "integer",
+      "min": 1
+    },
+    "cycle": {
+      "type": "integer",
+      "min": 1,
+      "max": 400
+    },
+    "op_settings": {
+      "type": "array",
+      "length": 3,
+      "item_type": "number",
+      "min": -5.0,
+      "max": 5.0
+    },
+    "sensors": {
+      "type": "array",
+      "length": 21,
+      "item_type": "number",
+      "min": -500.0,
+      "max": 500.0
+    },
+    "source": {
+      "type": "string",
+      "allowed_values": ["manual", "csv"]
+    }
+  }
+}

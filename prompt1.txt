@@ -40,7 +40,14 @@ Etapa 1:
 Etapa 2:
 
 
-## AAA
+## Resumen de la propuesta
 
-conda install -y -c conda-forge numpy pandas scipy matplotlib openpyxl
-pip install streamlit
+Nuestro proyecto propone desarrollar una **app funcional de inteligencia artificial para mantenimiento predictivo en sistemas de propulsión aeroespacial**, utilizando como base el conjunto de datos **NASA C-MAPSS**. Este dataset es un benchmark público de degradación de motores turbofán, generado con el simulador **Commercial Modular Aero-Propulsion System Simulation**, y contiene múltiples series temporales multivariadas de motores que evolucionan desde operación normal hasta falla. NASA indica además que el benchmark está organizado en **cuatro subconjuntos** bajo distintas combinaciones de condiciones operativas y modos de falla.
+
+La intención del proyecto no es afirmar que estamos monitoreando un motor comercial específico actualmente en servicio, sino **demostrar una arquitectura de IA transferible para PHM (Prognostics and Health Management)** en el contexto aeroespacial. En otras palabras, queremos construir un prototipo que muestre cómo una app puede recibir datos históricos de sensores de un motor, analizar su degradación y producir una salida útil para mantenimiento, como una estimación de **vida útil remanente (RUL)**, un **nivel de riesgo**, y una **recomendación operativa**. NASA describe el dataset como series temporales de una flota de motores del mismo tipo, donde cada motor inicia con distintos niveles de desgaste inicial y variación de manufactura. 
+
+El valor del proyecto está en que transforma datos complejos en una herramienta de decisión. La app propuesta actuaría como un **panel inteligente de salud del motor**: tomaría las lecturas de sensores por ciclo, aplicaría un pipeline de limpieza y preprocesamiento, usaría un modelo temporal de IA para inferir el estado de degradación, y mostraría al usuario una salida interpretable, por ejemplo: “estado saludable”, “degradación moderada”, “RUL estimado: 25 ciclos”, o “programar inspección en la próxima ventana de mantenimiento”. Este enfoque es coherente con el uso actual de C-MAPSS como benchmark de pronóstico de falla y RUL en motores aeronáuticos. 
+
+Desde el punto de vista técnico, la propuesta se centra en **series temporales multivariadas**, porque la degradación de un motor no se refleja en una sola variable, sino en patrones acoplados entre varios sensores a lo largo del tiempo. Por eso, un enfoque de IA basado en modelos temporales —como LSTM, TCN o Transformers temporales— es más adecuado que reglas fijas o umbrales aislados. Además, el benchmark C-MAPSS permite evaluar diferentes niveles de complejidad, desde escenarios simples hasta configuraciones con múltiples condiciones operativas y modos de falla, lo cual lo vuelve apropiado para una demo seria y defendible. 
+
+En términos de entregable, la app funcionaría como una **prueba de concepto académica validada sobre un benchmark aeroespacial estándar**. No se presentaría como un sistema listo para despliegue industrial inmediato, sino como un prototipo funcional que demuestra la viabilidad de un flujo PHM completo: ingestión de datos, auditoría de calidad, predicción de degradación, explicación de variables influyentes y soporte a decisiones de mantenimiento. Ese encuadre es importante, porque C-MAPSS es un dataset simulado, pero sigue siendo muy relevante como base para investigación y desarrollo en mantenimiento predictivo aeroespacial. 

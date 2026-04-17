@@ -24,6 +24,8 @@ dist/
 out/*
 !out/excel/
 !out/excel/*.xlsx
+!out/dashboard/
+!out/dashboard/*.txt
 fig/
 
 # OS / editor

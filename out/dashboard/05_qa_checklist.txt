@@ -1,0 +1,23 @@
+QA CHECKLIST - DASHBOARD MOCK PHM (GO/NO-GO)
+
+Functional checks
+[ ] Manual flow produces prediction without crash.
+[ ] CSV flow produces prediction for valid schema.
+[ ] CSV invalid schema shows clear validation message.
+[ ] Dataset/unit changes produce coherent output refresh.
+[ ] Tabs render with no blocking errors.
+[ ] All states render: sin_datos, loading, error_validacion, ok.
+
+Business coherence checks
+[ ] rul_pred <= 20 always maps to critical.
+[ ] 20 < rul_pred <= 60 maps to warning.
+[ ] rul_pred > 60 maps to healthy.
+[ ] Recommendation text matches risk level.
+[ ] Historical trend has no non-physical jumps in standard mode.
+
+Performance checks
+[ ] Perceived response time stays under 2s with configured latency.
+
+Go/No-Go rule
+- GO: all items checked.
+- NO-GO: at least one blocker in functional checks.

@@ -1,0 +1,21 @@
+INTEGRATION RISKS - MOCK TO REAL
+
+1) Schema drift risk
+- Real service may change field names/types.
+- Mitigation: enforce output schema checks in service boundary.
+
+2) Latency risk
+- Real model may exceed UX target.
+- Mitigation: loading state + timeout handling + async call option.
+
+3) Data quality risk
+- Real inputs can include missing/noisy/out-of-distribution values.
+- Mitigation: keep robust validation and explicit error states.
+
+4) Recommendation mismatch risk
+- Predicted risk and recommendation text may diverge.
+- Mitigation: centralize mapping policy and test by risk level.
+
+5) Versioning risk
+- Untracked model updates reduce traceability.
+- Mitigation: expose model_version and timestamp on every prediction.

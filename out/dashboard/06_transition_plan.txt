@@ -1,0 +1,26 @@
+TRANSITION PLAN - MOCK TO REAL SERVICES
+
+Goal
+- Replace mock internals without changing UI contract.
+
+Stable interface (must remain)
+- predict(input_payload) -> output_payload
+- Input fields: dataset_id, unit_id, cycle, op_settings, sensors, source
+- Output fields: rul_pred, risk_level, confidence_band, recommendation_text, model_version, timestamp
+
+Step 1: Real preprocessing integration
+- Replace in-service validators with shared preprocessing module.
+- Keep same input schema and error messages structure.
+
+Step 2: Real model integration
+- Replace mock RUL equation with trained model inference.
+- Keep risk threshold policy as configuration.
+- Preserve output schema.
+
+Step 3: Recommendation engine integration
+- Replace static recommendation mapping with rule engine/service.
+- Keep recommendation_text field and risk coherence.
+
+Regression guardrails
+- Re-run full QA checklist after each step.
+- No UI code changes required for service replacement.
