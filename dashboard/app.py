@@ -1,17 +1,20 @@
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 import pandas as pd
 import streamlit as st
 
-try:
-    from components import render_history_chart, render_kpis, render_result_detail
-    from mock.service import ValidationError, generate_history, predict
-except ModuleNotFoundError:
-    from .components import render_history_chart, render_kpis, render_result_detail
-    from .mock.service import ValidationError, generate_history, predict
+ROOT_DIR = Path(__file__).resolve().parents[1]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
+from dashboard.components import render_history_chart, render_kpis, render_result_detail
+from dashboard.mock.service import ValidationError
+
+from src.agent_layer.orchestrator import orchestrate_prediction
 
 
 DATASET_UNIT_LIMITS = {
@@ -142,12 +145,10 @@ def run_prediction(payload: Dict[str, Any]) -> None:
     try:
         st.session_state["app_status"] = "loading"
         with st.spinner("Running mock inference..."):
-            result = predict(payload)
+            result = orchestrate_prediction(payload)
         st.session_state["last_payload"] = payload
         st.session_state["last_result"] = result
-        st.session_state["history"] = generate_history(
-            cycle=payload["cycle"], rul_pred=result["rul_pred"], length=30
-        )
+        st.session_state["history"] = result.get("history", [])
         st.session_state["app_status"] = "ok"
         st.session_state["last_error"] = ""
     except ValidationError as e:
@@ -277,7 +278,21 @@ def main() -> None:
             st.info("No recommendation available.")
         else:
             st.markdown(f"**Risk level:** `{result['risk_level']}`")
+            st.markdown(
+                f"**Priority:** `{result.get('recommendation_priority', 'N/A')}` | "
+                f"**Risk score:** `{result.get('risk_score', 0):.1f}/100`"
+            )
             st.write(result["recommendation_text"])
+            if result.get("recommendation_alternatives"):
+                st.markdown("**Alternative actions:**")
+                for alt in result["recommendation_alternatives"]:
+                    st.write(f"- {alt}")
+            if result.get("dashboard_note"):
+                st.caption(result["dashboard_note"])
+            if result.get("evidence_summary"):
+                st.caption(f"Evidence: {result['evidence_summary']}")
+            if result.get("audit_record_id"):
+                st.caption(f"Audit record: {result['audit_record_id']}")
             st.caption(
                 "Operational guidance is mock-only and intended for UI/flow validation."
             )

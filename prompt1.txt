@@ -1,18 +1,5 @@
 # Guía
 
-Se va a desarrollar algo como una aplicación donde se podrá ingresar datos del motor (sensores o archivos), y el sistema analizará esa información usando inteligencia artificial.
-Primero se deberá entrenar un modelo con el dataset de la NASA para que aprenda cómo se degrada un motor en el tiempo.
-Luego, ese modelo podrá estimar cuánto tiempo de vida útil le queda (RUL), identificar el nivel de riesgo y dar una recomendación de mantenimiento.
-Finalmente, todo esto se integra en un dashboard o app interactiva donde se podrán ingresar datos y obtener el resultado de forma automática y visual.
-El proyecto tendría lo siguiente:
-Preparación y análisis del dataset
-Desarrollo del modelo predictivo
-Lógica de riesgo y recomendaciones
-Creación del dashboard/app
-Presentación final
-Escalabilidad y Rueda
-Documento/paper de cómo se realizó paso a paso
-
 ## Bosquejo de aplicación
 
 Capa 1: Modelo de pronóstico
@@ -51,3 +38,12 @@ El valor del proyecto está en que transforma datos complejos en una herramienta
 Desde el punto de vista técnico, la propuesta se centra en **series temporales multivariadas**, porque la degradación de un motor no se refleja en una sola variable, sino en patrones acoplados entre varios sensores a lo largo del tiempo. Por eso, un enfoque de IA basado en modelos temporales —como LSTM, TCN o Transformers temporales— es más adecuado que reglas fijas o umbrales aislados. Además, el benchmark C-MAPSS permite evaluar diferentes niveles de complejidad, desde escenarios simples hasta configuraciones con múltiples condiciones operativas y modos de falla, lo cual lo vuelve apropiado para una demo seria y defendible. 
 
 En términos de entregable, la app funcionaría como una **prueba de concepto académica validada sobre un benchmark aeroespacial estándar**. No se presentaría como un sistema listo para despliegue industrial inmediato, sino como un prototipo funcional que demuestra la viabilidad de un flujo PHM completo: ingestión de datos, auditoría de calidad, predicción de degradación, explicación de variables influyentes y soporte a decisiones de mantenimiento. Ese encuadre es importante, porque C-MAPSS es un dataset simulado, pero sigue siendo muy relevante como base para investigación y desarrollo en mantenimiento predictivo aeroespacial. 
+
+## Descripción de proyecto
+
+Se va a desarrollar algo como una aplicación donde se podrá ingresar datos del motor (sensores o archivos), y el sistema analizará esa información usando inteligencia artificial.
+Primero se deberá entrenar un modelo con el dataset de la NASA para que aprenda cómo se degrada un motor en el tiempo.
+Luego, ese modelo podrá estimar cuánto tiempo de vida útil le queda (RUL), identificar el nivel de riesgo y dar una recomendación de mantenimiento.
+Finalmente, todo esto se integra en un dashboard o app interactiva donde se podrán ingresar datos y obtener el resultado de forma automática y visual.
+Además, se hablará sobre escalabilidad o despliegue en un entorno real y el funcionamiento en espiritu "The flywheel is now spinning. Keep it turning."
+

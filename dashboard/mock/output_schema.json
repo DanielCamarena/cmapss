@@ -4,8 +4,13 @@
   "required_fields": [
     "rul_pred",
     "risk_level",
+    "risk_score",
     "confidence_band",
     "recommendation_text",
+    "recommendation_priority",
+    "recommendation_alternatives",
+    "rationale",
+    "audit_record_id",
     "model_version",
     "timestamp"
   ],
@@ -18,6 +23,11 @@
       "type": "string",
       "allowed_values": ["healthy", "warning", "critical"]
     },
+    "risk_score": {
+      "type": "number",
+      "min": 0,
+      "max": 100
+    },
     "confidence_band": {
       "type": "object",
       "required_fields": ["low", "high"],
@@ -27,6 +37,21 @@
       }
     },
     "recommendation_text": {
+      "type": "string"
+    },
+    "recommendation_priority": {
+      "type": "string",
+      "allowed_values": ["low", "medium", "high", "urgent"]
+    },
+    "recommendation_alternatives": {
+      "type": "array",
+      "item_type": "string"
+    },
+    "rationale": {
+      "type": "array",
+      "item_type": "string"
+    },
+    "audit_record_id": {
       "type": "string"
     },
     "model_version": {

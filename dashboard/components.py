@@ -23,13 +23,14 @@ def risk_badge(risk_level: str) -> str:
 
 
 def render_kpis(result: Dict[str, Any]) -> None:
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
     col1.metric("RUL Estimate (cycles)", f"{result['rul_pred']:.2f}")
     col2.metric(
         "Confidence Band",
         f"{result['confidence_band']['low']:.1f} - {result['confidence_band']['high']:.1f}",
     )
     col3.markdown(risk_badge(result["risk_level"]), unsafe_allow_html=True)
+    col4.metric("Risk Score", f"{result.get('risk_score', 0):.1f}/100")
 
 
 def render_history_chart(history: List[Dict[str, float]]) -> None:
@@ -59,6 +60,11 @@ def render_result_detail(payload: Dict[str, Any], result: Dict[str, Any]) -> Non
     )
     st.subheader("Model Output")
     st.json(result)
+    if result.get("rationale"):
+        st.subheader("Decision Rationale")
+        for idx, item in enumerate(result["rationale"], start=1):
+            st.write(f"{idx}. {item}")
+    st.caption(f"Audit record id: {result.get('audit_record_id', 'N/A')}")
     st.caption(
         "Decision rule: critical <= 20, warning <= 60, healthy > 60 (cycles)."
     )

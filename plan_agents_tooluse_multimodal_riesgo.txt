@@ -1,0 +1,230 @@
+PLAN DE TRABAJO - CAPA "AGENTS, TOOL USE Y MULTIMODAL EXTRACTION"
+ENFOQUE: LOGICA DE RIESGO Y RECOMENDACIONES (PHM C-MAPSS)
+
+Objetivo general
+- Diseñar e implementar una capa inteligente que convierta señales de degradacion en:
+  1) nivel de riesgo interpretable
+  2) recomendacion operativa accionable
+  3) trazabilidad de por que se emitio esa recomendacion
+
+Contexto
+- Esta capa se apoya en la salida del modelo RUL (real o mock) y en metadatos operativos.
+- Debe integrarse con el dashboard sin romper el contrato UI actual.
+
+Entradas de la capa
+- Prediccion RUL: rul_pred
+- Banda de confianza: confidence_band
+- Contexto operacional: dataset_id, unit_id, cycle, op_settings, sensores clave
+- Evidencia adicional multimodal (opcional): reportes PDF, notas tecnicas, capturas, tablas
+
+Salidas de la capa
+- risk_level: healthy / warning / critical
+- risk_score: 0-100
+- recommendation_text: accion concreta
+- recommendation_priority: low / medium / high / urgent
+- rationale: reglas/evidencias que activaron la recomendacion
+- audit_record_id: identificador de trazabilidad
+
+Precondiciones
+1) Entorno activo:
+   conda activate cmapss
+2) Estructuras base creadas:
+   src/agent_layer/
+   out/agent_layer/
+3) Contratos de dashboard disponibles (input/output actuales del mock)
+
+FASE 1 - Definicion de contrato y gobernanza de decisiones
+Objetivo
+- Formalizar I/O y criterios de seguridad antes de automatizar recomendaciones.
+
+Tareas
+1) Definir schema de entrada unificado para la capa de riesgo.
+2) Definir schema de salida con campos de recomendacion y trazabilidad.
+3) Definir politicas de decision:
+   - nunca ocultar incertidumbre
+   - no emitir acciones de alto impacto sin evidencia minima
+   - priorizar recomendaciones conservadoras ante ambiguedad
+4) Definir catalogo inicial de recomendaciones y severidad.
+
+Entregables
+- out/agent_layer/01_risk_io_schema.json
+- out/agent_layer/01_policy_rules.txt
+- out/agent_layer/01_recommendation_catalog.csv
+
+Criterio de salida
+- Contrato y reglas aprobadas por el equipo.
+
+FASE 2 - Motor de riesgo base (reglas + score)
+Objetivo
+- Implementar una version robusta y explicable de clasificacion de riesgo.
+
+Tareas
+1) Construir score de riesgo con factores:
+   - RUL estimado
+   - ancho de confidence band
+   - tendencia reciente de degradacion
+   - consistencia entre señales
+2) Definir mapeo score -> risk_level.
+3) Agregar reglas hard-stop:
+   - critical inmediato si RUL debajo de umbral extremo
+   - warning preventivo si incertidumbre alta con degradacion rapida
+4) Generar rationale estructurado por regla activada.
+
+Entregables
+- src/agent_layer/risk_engine.py
+- out/agent_layer/02_risk_scoring_design.txt
+- out/agent_layer/02_thresholds_config.json
+
+Criterio de salida
+- Risk level reproducible y explicable para casos de prueba.
+
+FASE 3 - Agent orchestration y Tool Use
+Objetivo
+- Coordinar herramientas para enriquecer decision y recomendacion.
+
+Tareas
+1) Definir agente orquestador con pipeline:
+   ingest -> validate -> enrich -> score -> recommend -> audit
+2) Integrar tool use minimo:
+   - tool A: lector de predicciones/model output
+   - tool B: consulta de reglas y catalogo de acciones
+   - tool C: generador de resumen explicable para dashboard
+3) Definir fallback si alguna herramienta falla:
+   - continuar con reglas base
+   - marcar salida con bandera de degradacion de servicio
+
+Entregables
+- src/agent_layer/orchestrator.py
+- src/agent_layer/tools.py
+- out/agent_layer/03_toolchain_contracts.txt
+
+Criterio de salida
+- Orquestacion estable con degradacion controlada.
+
+FASE 4 - Multimodal extraction para evidencia contextual
+Objetivo
+- Incorporar texto/tablas/imagenes como evidencia adicional para riesgo.
+
+Tareas
+1) Definir tipos multimodales permitidos:
+   - PDF tecnico
+   - tabla CSV/XLSX
+   - imagen de inspeccion (si aplica)
+2) Implementar extractor de evidencia:
+   - extraer entidades (componente, fallo, severidad, fecha)
+   - normalizar a formato comun
+3) Enlazar evidencia al rationale de riesgo.
+4) Definir score de confianza de evidencia extraida.
+
+Entregables
+- src/agent_layer/multimodal_extractor.py
+- out/agent_layer/04_evidence_schema.json
+- out/agent_layer/04_extraction_rules.txt
+
+Criterio de salida
+- Evidencia multimodal integrada en la salida sin romper I/O principal.
+
+FASE 5 - Generacion de recomendaciones accionables
+Objetivo
+- Traducir riesgo a acciones concretas de mantenimiento.
+
+Tareas
+1) Definir plantillas por nivel de riesgo y contexto.
+2) Agregar priorizacion por ventana operativa:
+   - next window
+   - immediate inspection
+   - monitor only
+3) Incluir recomendaciones alternativas cuando incertidumbre sea alta.
+4) Adjuntar justificacion corta y larga para UI/reportes.
+
+Entregables
+- src/agent_layer/recommender.py
+- out/agent_layer/05_recommendation_templates.txt
+- out/agent_layer/05_priority_matrix.csv
+
+Criterio de salida
+- Recomendaciones consistentes, accionables y auditables.
+
+FASE 6 - Integracion con dashboard y auditoria
+Objetivo
+- Mostrar decision completa en UI y dejar huella auditable.
+
+Tareas
+1) Extender payload consumido por dashboard:
+   risk_score, priority, rationale, audit_record_id.
+2) Actualizar pestaña Recomendaciones con:
+   - accion principal
+   - alternativas
+   - evidencias clave
+3) Guardar auditoria por prediccion en out/agent_layer/audit_log.jsonl.
+4) Agregar vista de "por que esta decision".
+
+Entregables
+- out/agent_layer/06_dashboard_mapping.txt
+- out/agent_layer/audit_log.jsonl (formato definido)
+- out/agent_layer/06_explainability_checklist.txt
+
+Criterio de salida
+- Dashboard comunica riesgo + recomendacion + explicacion.
+
+FASE 7 - Validacion y hardening
+Objetivo
+- Probar seguridad, consistencia y utilidad de la capa.
+
+Tareas
+1) Casos nominales:
+   healthy, warning, critical.
+2) Casos adversos:
+   input incompleto, ruido extremo, conflicto entre fuentes.
+3) Evaluar estabilidad de recomendaciones entre corridas.
+4) Definir criterios Go/No-Go para produccion interna.
+
+Entregables
+- out/agent_layer/07_test_matrix.txt
+- out/agent_layer/07_failure_modes.txt
+- out/agent_layer/07_acceptance_criteria.txt
+
+Criterio de salida
+- Capa validada para operar como componente de decision en la app.
+
+Orden recomendado de ejecucion
+1) Fase 1
+2) Fase 2
+3) Fase 3
+4) Fase 4
+5) Fase 5
+6) Fase 6
+7) Fase 7
+
+Tiempo estimado (1-2 personas)
+- Fase 1-2: 2-3 dias
+- Fase 3-5: 3-5 dias
+- Fase 6-7: 2-3 dias
+- Total: 7-11 dias
+
+Definicion de exito
+- La app no solo predice RUL; tambien decide riesgo y recomienda acciones con trazabilidad.
+- La capa de agentes funciona con o sin evidencia multimodal adicional.
+- El usuario final puede entender y auditar cada recomendacion emitida.
+
+ACTUALIZACION DE INTEGRACION CON DASHBOARD MOCK (V1 IMPLEMENTADA)
+- Integracion objetivo: dashboard consume salida de `src/agent_layer/orchestrator.py`.
+- Contrato extendido ya definido para UI:
+  - rul_pred
+  - confidence_band
+  - risk_level
+  - risk_score
+  - recommendation_text
+  - recommendation_priority
+  - recommendation_alternatives
+  - rationale
+  - audit_record_id
+  - evidence_summary
+- Auditoria: cada inferencia debe persistir un registro en:
+  - out/agent_layer/audit_log.jsonl
+- Modo multimodal actual:
+  - extractor en modo `stub` (no bloquea flujo principal)
+  - evidencia resumida en `evidence_summary`
+- Resultado esperado de la V1:
+  - dashboard operativo como front de la capa de agentes,
+  - con riesgo/recomendacion explicables y trazables, aun sin extraccion multimodal completa.
