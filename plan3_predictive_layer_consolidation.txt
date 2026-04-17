@@ -1,0 +1,222 @@
+﻿PLAN 3 - CONSOLIDACION FINAL DE Predictive Layer (RUL) PARA ENTREGA END-TO-END
+BASE: RESULTADOS PLAN 1 (EDA) + PLAN 2 (RESEARCH/ARQUITECTURA)
+
+Objetivo general
+- Cerrar la Predictive Layer con calidad de entrega final:
+  1) multiples modelos entrenados y comparados
+  2) modelo champion seleccionado con evidencia
+  3) contrato de inferencia final estable
+  4) servicio listo para integrar con layer 2 y dashboard final
+
+Insumos obligatorios
+- out/eda/*
+- fig/eda/*
+- out/processed/train_processed.parquet
+- out/processed/valid_processed.parquet
+- out/processed/test_processed.parquet
+- out/research/*
+
+Resultado esperado al finalizar plan 3
+- Predictive Layer lista para produccion interna.
+- Modelo champion + challengers documentados.
+- Pipeline de inferencia estable para layer 2 (agents) y layer 3 (dashboard).
+
+PORTAFOLIO DE MODELOS A IMPLEMENTAR (OBLIGATORIO EN ESTE PLAN)
+1) Modelo tabular baseline:
+   - Random Forest Regressor
+2) Modelo tabular fuerte:
+   - Gradient Boosting Regressor (o XGBoost si se habilita)
+3) Modelo temporal secuencial:
+   - LSTM (primer baseline temporal)
+4) Modelo temporal alternativo:
+   - TCN o GRU (al menos uno)
+
+Nota:
+- Todos optimizan target primario rul_capped (cap=130).
+- rul_linear se mantiene para diagnostico y analisis secundario.
+
+FASE 1 - Cierre de decisiones de modelado
+Objetivo
+- Congelar decisiones antes del entrenamiento comparativo.
+
+Tareas
+1) Confirmar target final:
+   - primario: rul_capped (130)
+   - secundario: rul_linear
+2) Confirmar features y estrategia de ventanas temporales.
+3) Confirmar split anti-leakage por unit_id y orden temporal.
+4) Definir matriz de comparacion de modelos y reglas de desempate.
+
+Entregables
+- out/predictive_layer/01_modeling_decisions_frozen.txt
+- out/predictive_layer/01_model_comparison_protocol.txt
+
+Criterio de salida
+- No quedan decisiones abiertas para entrenar todos los candidatos.
+
+FASE 2 - Implementacion y entrenamiento multi-modelo
+Objetivo
+- Entrenar portafolio completo (tabular + temporal).
+
+Tareas
+1) Implementar entrenamiento tabular:
+   - train_rf.py
+   - train_gb.py
+2) Implementar entrenamiento temporal:
+   - train_lstm.py
+   - train_tcn_or_gru.py
+3) Versionar artefactos por modelo:
+   - pesos/modelo serializado
+   - hiperparametros
+   - semilla y metadata
+4) Guardar predicciones de valid para comparativa uniforme.
+
+Entregables
+- src/predictive_layer/train_rf.py
+- src/predictive_layer/train_gb.py
+- src/predictive_layer/train_lstm.py
+- src/predictive_layer/train_tcn_or_gru.py
+- out/predictive_layer/models/*
+- out/predictive_layer/02_train_metadata_<model>.json
+- out/predictive_layer/02_valid_predictions_<model>.parquet
+
+Criterio de salida
+- Los 4 candidatos entrenan y generan salida comparable.
+
+FASE 3 - Evaluacion comparativa y seleccion champion
+Objetivo
+- Seleccionar modelo final con criterios tecnicos y operativos.
+
+Tareas
+1) Calcular metricas por modelo:
+   - RMSE, MAE global
+   - RMSE, MAE por FD001..FD004
+2) Evaluar error por bandas de RUL:
+   - 0-20, 21-60, >60
+3) Evaluar latencia de inferencia por muestra y por lote.
+4) Seleccionar champion y 1-2 challengers.
+5) Documentar decision y tradeoffs.
+
+Entregables
+- out/predictive_layer/03_metrics_global_by_model.csv
+- out/predictive_layer/03_metrics_by_dataset_by_model.csv
+- out/predictive_layer/03_error_by_rul_band_by_model.csv
+- out/predictive_layer/03_latency_by_model.csv
+- out/predictive_layer/03_champion_decision_record.md
+
+Criterio de salida
+- Modelo champion aprobado con evidencia cuantitativa.
+
+FASE 4 - Calibracion y robustez final
+Objetivo
+- Mejorar confiabilidad del champion para integracion final.
+
+Tareas
+1) Ajustar calibracion de salida (si aplica).
+2) Construir banda de confianza operacional.
+3) Probar robustez:
+   - ruido moderado
+   - missing parcial de sensores
+   - drift por subset operativo
+4) Definir comportamiento de fallback.
+
+Entregables
+- out/predictive_layer/04_calibration_report.md
+- out/predictive_layer/04_confidence_band_policy.json
+- out/predictive_layer/04_robustness_results.csv
+- out/predictive_layer/04_fallback_policy.txt
+
+Criterio de salida
+- Champion robusto y con incertidumbre reportable.
+
+FASE 5 - Contrato final de inferencia (listo para capas 2 y 3)
+Objetivo
+- Publicar interfaz estable de Predictive Layer.
+
+Tareas
+1) Definir schema de entrada v1.
+2) Definir schema de salida v1:
+   - rul_pred
+   - confidence_band
+   - model_version
+   - timestamp
+   - service_status
+3) Definir contrato de error y codigos de estado.
+4) Incluir ejemplos validos/invalidos.
+
+Entregables
+- out/predictive_layer/05_input_schema_v1.json
+- out/predictive_layer/05_output_schema_v1.json
+- out/predictive_layer/05_error_contract_v1.json
+- out/predictive_layer/05_contract_examples.json
+
+Criterio de salida
+- layer 2 puede consumir Predictive Layer sin conocer internals.
+
+FASE 6 - Servicio de inferencia e integracion final con dashboard
+Objetivo
+- Llegar al dashboard final con Predictive Layer real conectada.
+
+Tareas
+1) Implementar servicio local de inferencia champion:
+   - src/predictive_layer/inference_service.py
+2) Conectar adaptador de layer 2 al contrato real de Predictive Layer.
+3) Ejecutar smoke test end-to-end:
+   - input dashboard -> Predictive Layer -> layer 2 -> dashboard
+4) Verificar que dashboard se mantiene funcional con fallback.
+
+Entregables
+- src/predictive_layer/inference_service.py
+- out/predictive_layer/06_smoke_test_e2e.txt
+- out/predictive_layer/06_latency_e2e.csv
+- out/predictive_layer/06_dashboard_integration_report.md
+
+Criterio de salida
+- Flujo completo funcionando en entorno local y listo para nube.
+
+FASE 7 - Release package de Predictive Layer
+Objetivo
+- Entregar cierre formal para operacion e iteracion.
+
+Tareas
+1) Consolidar release notes.
+2) Listar riesgos residuales y mitigaciones.
+3) Definir backlog de mejora (transformer temporal, physics-guided, recalibracion).
+4) Definir checklist de despliegue.
+
+Entregables
+- out/predictive_layer/07_release_notes.md
+- out/predictive_layer/07_residual_risks.md
+- out/predictive_layer/07_next_steps_backlog.md
+- out/predictive_layer/07_deploy_checklist.txt
+
+Criterio de salida
+- Predictive Layer cerrada para entrega final del sistema.
+
+Orden recomendado de ejecucion
+1) Fase 1
+2) Fase 2
+3) Fase 3
+4) Fase 4
+5) Fase 5
+6) Fase 6
+7) Fase 7
+
+Tiempo estimado (1-2 personas)
+- Fase 1: 0.5 dia
+- Fase 2: 2-4 dias
+- Fase 3: 1-2 dias
+- Fase 4: 1 dia
+- Fase 5: 0.5 dia
+- Fase 6: 1 dia
+- Fase 7: 0.5 dia
+- Total: 6.5 a 9.5 dias
+
+Definicion de exito
+- Hay comparativa real de modelos tabulares y temporales.
+- Existe champion seleccionado con evidencia y contrato estable.
+- El dashboard final funciona con Predictive Layer real y fallback operativo.
+
+
+
+

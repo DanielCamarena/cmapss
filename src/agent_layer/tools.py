@@ -1,22 +1,99 @@
 from __future__ import annotations
 
 import json
+import random
+import sys
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict
-
-from dashboard.mock.service import predict
+from typing import Any, Dict, List
 
 
-SCENARIOS_PATH = Path(__file__).resolve().parents[2] / "dashboard" / "mock" / "scenarios.json"
+ROOT_DIR = Path(__file__).resolve().parents[2]
+SRC_DIR = ROOT_DIR / "src"
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
+
+THRESHOLDS_PATH = ROOT_DIR / "out" / "agent_layer" / "02_thresholds_config.json"
+
+
+class ModelProviderError(RuntimeError):
+    """Raised when predictive layer output cannot be obtained."""
+
+
+def validate_input_payload(payload: Dict[str, Any]) -> None:
+    required = ["dataset_id", "unit_id", "cycle", "op_settings", "sensors", "source"]
+    missing = [field for field in required if field not in payload]
+    if missing:
+        raise ValueError(f"Missing required fields: {missing}")
+
+    if not isinstance(payload["dataset_id"], str) or not payload["dataset_id"]:
+        raise ValueError("dataset_id must be a non-empty string")
+
+    if not isinstance(payload["unit_id"], int) or payload["unit_id"] < 1:
+        raise ValueError("unit_id must be an integer >= 1")
+
+    if not isinstance(payload["cycle"], int) or payload["cycle"] < 1:
+        raise ValueError("cycle must be an integer >= 1")
+
+    op_settings = payload["op_settings"]
+    sensors = payload["sensors"]
+    if not isinstance(op_settings, list) or len(op_settings) != 3:
+        raise ValueError("op_settings must be a list of 3 numbers")
+    if not isinstance(sensors, list) or len(sensors) != 21:
+        raise ValueError("sensors must be a list of 21 numbers")
+
+    if payload["source"] not in {"manual", "csv", "api"}:
+        raise ValueError("source must be one of: manual, csv, api")
+
+
+def generate_history(cycle: int, rul_pred: float, length: int = 30) -> List[Dict[str, float]]:
+    """Generate a monotonic degradation history for dashboard trend display."""
+    n = max(10, min(length, cycle))
+    start_cycle = cycle - n + 1
+    seed = int(cycle + round(rul_pred * 100))
+    rng = random.Random(seed)
+
+    current = max(rul_pred + (n * 0.9), rul_pred + 5.0)
+    points: List[Dict[str, float]] = []
+    for c in range(start_cycle, cycle + 1):
+        decrement = 0.65 + abs(rng.uniform(-0.2, 0.35))
+        current = max(rul_pred, current - decrement)
+        points.append({"cycle": c, "rul_est": round(current, 2)})
+    points[-1]["rul_est"] = round(rul_pred, 2)
+    return points
 
 
 def tool_read_model_output(payload: Dict[str, Any]) -> Dict[str, Any]:
-    return predict(payload)
+    """Primary provider: predictive_layer."""
+    try:
+        from predictive_layer.inference_service import predict_rul
+
+        out = predict_rul(payload)
+        return {
+            "rul_pred": float(out["rul_pred"]),
+            "confidence_band": dict(out["confidence_band"]),
+            "model_version": str(out.get("model_version", "predictive_layer-unknown")),
+            "timestamp": str(out.get("timestamp", datetime.now(timezone.utc).isoformat())),
+            "service_status": str(out.get("service_status", "ok")),
+            "provider": "predictive_layer",
+        }
+    except Exception as e:
+        raise ModelProviderError(f"Predictive layer unavailable: {e}") from e
 
 
 def tool_read_policy() -> Dict[str, Any]:
-    with SCENARIOS_PATH.open("r", encoding="utf-8") as f:
-        return json.load(f)
+    if THRESHOLDS_PATH.exists():
+        with THRESHOLDS_PATH.open("r", encoding="utf-8") as f:
+            return json.load(f)
+
+    return {
+        "critical_max": 20.0,
+        "warning_max": 60.0,
+        "score_warning_min": 50.0,
+        "score_critical_min": 80.0,
+    }
 
 
 def tool_dashboard_explainer(risk_level: str, risk_score: float) -> str:

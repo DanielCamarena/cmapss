@@ -45,23 +45,29 @@ def compute_risk_decision(
     rul_risk = _norm_rul_risk(rul_pred)
     trend_risk = _norm_trend_risk(history)
 
+    score_warning_min = float(thresholds.get("score_warning_min", 50.0))
+    score_critical_min = float(thresholds.get("score_critical_min", 80.0))
+    critical_max = float(thresholds.get("critical_max", 20.0))
+    warning_max = float(thresholds.get("warning_max", 60.0))
+
     weighted = (0.6 * rul_risk) + (0.25 * uncertainty) + (0.15 * trend_risk)
     risk_score = round(max(0.0, min(100.0, weighted * 100.0)), 2)
-    risk_level = _map_score_to_level(risk_score)
+    if risk_score >= score_critical_min:
+        risk_level = "critical"
+    elif risk_score >= score_warning_min:
+        risk_level = "warning"
+    else:
+        risk_level = _map_score_to_level(risk_score)
 
     # Hard-stop consistency with PHM business rule.
-    if rul_pred <= thresholds["critical_max"]:
+    if rul_pred <= critical_max:
         risk_level = "critical"
         risk_score = max(85.0, risk_score)
-        rationale.append(
-            f"Hard-stop rule activated: rul_pred <= {thresholds['critical_max']}."
-        )
-    elif rul_pred <= thresholds["warning_max"] and risk_level == "healthy":
+        rationale.append(f"Hard-stop rule activated: rul_pred <= {critical_max}.")
+    elif rul_pred <= warning_max:
         risk_level = "warning"
         risk_score = max(55.0, risk_score)
-        rationale.append(
-            f"Boundary rule activated: rul_pred <= {thresholds['warning_max']}."
-        )
+        rationale.append(f"Boundary rule activated: rul_pred <= {warning_max}.")
 
     if uncertainty >= 0.6:
         rationale.append("High uncertainty detected from confidence band width.")

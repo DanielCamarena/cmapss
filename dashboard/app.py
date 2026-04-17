@@ -13,7 +13,7 @@ if str(ROOT_DIR) not in sys.path:
 
 from dashboard.backend_adapter import run_prediction_with_adapter
 from dashboard.components import render_history_chart, render_kpis, render_result_detail
-from dashboard.mock.service import ValidationError
+from dashboard.errors import ServiceUnavailableError, ValidationError
 
 
 DATASET_UNIT_LIMITS = {
@@ -143,16 +143,23 @@ def parse_nasa_txt(uploaded_file: Any, dataset_id: str) -> pd.DataFrame:
 def run_prediction(payload: Dict[str, Any]) -> None:
     try:
         st.session_state["app_status"] = "loading"
-        with st.spinner("Running mock inference..."):
+        with st.spinner("Running prediction pipeline..."):
             result = run_prediction_with_adapter(payload)
         st.session_state["last_payload"] = payload
         st.session_state["last_result"] = result
         st.session_state["history"] = result.get("history", [])
-        st.session_state["app_status"] = "ok"
+        st.session_state["app_status"] = result.get("service_status", "ok")
         st.session_state["last_error"] = ""
     except ValidationError as e:
         st.session_state["app_status"] = "error_validacion"
         st.session_state["last_error"] = str(e)
+        st.session_state["last_result"] = None
+        st.session_state["history"] = []
+    except ServiceUnavailableError as e:
+        st.session_state["app_status"] = "degraded"
+        st.session_state["last_error"] = str(e)
+        st.session_state["last_result"] = None
+        st.session_state["history"] = []
 
 
 def render_status_banner() -> None:
@@ -160,9 +167,11 @@ def render_status_banner() -> None:
     if status == "sin_datos":
         st.info("State: sin_datos. Provide input and run prediction.")
     elif status == "loading":
-        st.warning("State: loading. Mock service is processing input.")
+        st.warning("State: loading. Pipeline is processing input.")
     elif status == "error_validacion":
         st.error(f"State: error_validacion. {st.session_state['last_error']}")
+    elif status in {"degraded", "fallback"}:
+        st.warning(f"State: {status}. {st.session_state['last_error']}")
     elif status == "ok":
         st.success("State: ok. Prediction ready.")
 

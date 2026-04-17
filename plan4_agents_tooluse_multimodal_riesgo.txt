@@ -1,0 +1,275 @@
+PLAN 4 - AGENT LAYER (TOOL USE + MULTIMODAL) PARA LOGICA DE RIESGO Y RECOMENDACIONES
+ENFOQUE: CONTRACT-FIRST, DESACOPLADO DE IMPLEMENTACIONES INTERNAS
+
+Resumen
+- Este plan define la capa 2 (`agent_layer`) como orquestador de decision.
+- La capa 2 NO debe depender de `dashboard.mock.*`.
+- Flujo objetivo: dashboard input -> predictive_layer output -> agent_layer decision -> dashboard render.
+- Extension objetivo: asistente LLM para construir escenarios "what-if" y relanzar pronostico.
+
+Objetivo general
+- Convertir prediccion de RUL en:
+  1) riesgo interpretable (`risk_level`, `risk_score`)
+  2) recomendacion accionable (`recommendation_text`, prioridad y alternativas)
+  3) trazabilidad/auditoria (`rationale`, `audit_record_id`, `service_status`)
+- Agregar un copiloto de escenarios para que el usuario del dashboard:
+  1) describa escenarios en lenguaje natural
+  2) reciba propuesta estructurada de cambios en input
+  3) relance pronostico y compare resultados
+- Mantener dashboard funcional aunque falle capa 2 (degraded via adapter).
+
+Arquitectura base y nombres oficiales
+- Layer 1: `predictive_layer` (pronostico RUL)
+- Layer 2: `agent_layer` (riesgo + recomendaciones)
+- Layer 3: `dashboard` (UI)
+
+Contratos (obligatorio, version v1)
+1) Contrato A - Dashboard -> Agent Layer (ingress raw)
+- dataset_id, unit_id, cycle
+- op_settings (len=3), sensors (len=21), source
+- history (opcional)
+
+2) Contrato B - Predictive Layer -> Agent Layer (model output)
+- rul_pred
+- confidence_band {low, high}
+- model_version
+- timestamp
+- service_status
+
+3) Contrato C - Agent Layer -> Dashboard (decision output)
+- rul_pred
+- confidence_band
+- risk_level
+- risk_score
+- recommendation_text
+- recommendation_priority
+- recommendation_alternatives
+- rationale
+- evidence_summary
+- audit_record_id
+- service_status (ok/degraded/fallback)
+- timestamp
+
+4) Contrato D - Scenario Assistant (new)
+- Input:
+  - `scenario_prompt` (texto usuario)
+  - `base_payload` (dataset_id, unit_id, cycle, op_settings, sensors, source)
+  - `constraints` (rangos permitidos, cambios maximos)
+- Output:
+  - `proposed_payload`
+  - `change_summary` (lista de cambios aplicados)
+  - `assumptions`
+  - `safety_notes`
+  - `service_status` (ok/degraded/fallback)
+
+Precondiciones
+1) Entorno:
+   `conda activate cmapss`
+2) Estructuras:
+   `src/agent_layer/`
+   `out/agent_layer/`
+3) Contratos de `predictive_layer` disponibles:
+   `out/predictive_layer/05_input_schema_v1.json`
+   `out/predictive_layer/05_output_schema_v1.json`
+   `out/predictive_layer/05_error_contract_v1.json`
+
+FASE 1 - Contratos y gobernanza
+Objetivo
+- Formalizar interfaces y reglas antes de ampliar logica.
+
+Tareas
+1) Publicar contrato A, B y C en `out/agent_layer`.
+2) Definir ejemplos validos/invalidos por contrato.
+3) Definir reglas de seguridad:
+   - no ocultar incertidumbre
+   - no recomendar accion de alto impacto sin evidencia minima
+   - degradar a fallback ante errores de herramientas/LLM
+4) Definir catalogo de recomendaciones y severidad.
+
+Entregables
+- `out/agent_layer/01_input_contract_v1.json`
+- `out/agent_layer/01_output_contract_v1.json`
+- `out/agent_layer/01_contract_examples.json`
+- `out/agent_layer/01_policy_rules.txt`
+- `out/agent_layer/01_recommendation_catalog.csv`
+
+Criterio de salida
+- Contratos versionados y aprobados por equipo.
+
+FASE 2 - Motor de riesgo base (reglas + score)
+Objetivo
+- Asegurar riesgo reproducible, interpretable y alineado al proyecto.
+
+Tareas
+1) Definir score compuesto: RUL, incertidumbre, tendencia.
+2) Hard-stops obligatorios (alineados con proyecto):
+   - `critical` si `rul_pred <= 20`
+   - `warning` si `20 < rul_pred <= 60`
+   - `healthy` si `rul_pred > 60`
+3) Mantener rationale estructurado por regla activada.
+4) Versionar thresholds y pesos.
+
+Entregables
+- `src/agent_layer/risk_engine.py`
+- `out/agent_layer/02_risk_scoring_design.txt`
+- `out/agent_layer/02_thresholds_config.json`
+
+Criterio de salida
+- Casos de prueba reproducen riesgo esperado.
+
+FASE 3 - Orquestacion y tool use (sin dependencia a mock de dashboard)
+Objetivo
+- Implementar pipeline estable de capa 2.
+
+Tareas
+1) Pipeline:
+   ingest -> validate -> get_predictive_output -> score -> recommend -> audit
+2) `tool_read_model_output` debe priorizar `predictive_layer.inference_service.predict_rul`.
+3) Solo usar mock como fallback controlado (no como dependencia principal).
+4) Registrar auditoria por inferencia.
+
+Entregables
+- `src/agent_layer/tools.py`
+- `src/agent_layer/orchestrator.py`
+- `out/agent_layer/03_toolchain_contracts.txt`
+- `out/agent_layer/audit_log.jsonl`
+
+Criterio de salida
+- Capa 2 funciona aun si se desactiva `dashboard.mock.service`.
+
+FASE 4 - Multimodal extraction (incremental)
+Objetivo
+- Anexar evidencia contextual sin romper contratos.
+
+Tareas
+1) Definir evidencia permitida: PDF, CSV/XLSX, imagen.
+2) Extraer entidades y normalizar.
+3) Resumir evidencia para UI.
+4) Definir confianza de evidencia.
+
+Entregables
+- `src/agent_layer/multimodal_extractor.py`
+- `out/agent_layer/04_evidence_schema.json`
+- `out/agent_layer/04_extraction_rules.txt`
+- `out/agent_layer/04_tool_interfaces.txt`
+
+Criterio de salida
+- `evidence_summary` disponible sin romper contrato C.
+
+FASE 5 - Recomendaciones accionables
+Objetivo
+- Traducir riesgo en accion operativa clara.
+
+Tareas
+1) Plantillas por riesgo y contexto operativo.
+2) Priorizacion (`urgent/high/low`) por nivel de riesgo.
+3) Alternativas cuando incertidumbre sea alta.
+4) Mensajes cortos y explicables para dashboard.
+
+Entregables
+- `src/agent_layer/recommender.py`
+- `out/agent_layer/05_recommendation_templates.txt`
+- `out/agent_layer/05_priority_matrix.csv`
+
+Criterio de salida
+- Recomendaciones consistentes entre casos equivalentes.
+
+FASE 6 - Integracion dashboard (contrato estable)
+Objetivo
+- Integrar capa 2 con dashboard sin acoplar UI a internals.
+
+Tareas
+1) Mapear contrato C a componentes de tabs (Resumen/Detalle/Historico/Recomendaciones).
+2) Verificar `backend_adapter`:
+   - camino primario: `agent_layer.orchestrate_prediction`
+   - degradacion controlada sin datos sinteticos en produccion
+3) Checklist de estados: `ok`, `degraded`, `fallback`, `error_validacion`, `sin_datos`.
+4) Pruebas de regresion UI con entradas manual/CSV/TXT.
+5) Integrar flujo de escenarios:
+   - baseline -> propuesta LLM -> confirmacion usuario -> rerun -> comparacion
+
+Entregables
+- `out/agent_layer/06_dashboard_mapping.txt`
+- `out/agent_layer/06_explainability_checklist.txt`
+- `out/dashboard_layer/contract_integration_checklist.txt`
+- `out/agent_layer/06_scenario_assistant_flow.txt`
+- `out/agent_layer/06_comparison_payload_schema.json`
+
+Criterio de salida
+- Dashboard comunica riesgo + recomendacion + explicacion, con fallback operativo.
+
+FASE 7 - LLM real (uso selectivo y seguro)
+Objetivo
+- Incorporar LLM donde agregue valor, sin perder control.
+
+Tareas
+1) Mantener motor deterministico como base de verdad.
+2) Usar LLM solo para:
+   - redaccion natural de recomendacion
+   - enriquecimiento textual de rationale
+   - resumen ejecutivo de evidencia
+   - propuesta de escenarios what-if (contract D)
+3) Definir politicas operativas:
+   - proveedor/modelo
+   - `GEMINI_API_KEY` (local + nube)
+   - timeout, retries, costo maximo
+4) Fallback obligatorio:
+   - si falla LLM -> salida por reglas + `service_status=fallback`
+5) Guardrails de escenario:
+   - no permitir cambios fuera de rango
+   - no mutar campos bloqueados (dataset_id/unit_id) sin confirmacion explicita
+   - siempre mostrar diff entre payload base y propuesto
+
+Entregables
+- `out/agent_layer/07_engine_decision_record.txt`
+- `out/agent_layer/07_llm_integration_policy.txt`
+- `out/agent_layer/07_nonfunctional_requirements.txt`
+- `out/agent_layer/07_scenario_assistant_policy.txt`
+- `out/agent_layer/07_prompt_templates_scenarios.txt`
+
+Criterio de salida
+- LLM no bloquea operacion ni rompe contratos.
+
+FASE 8 - Validacion final y hardening
+Objetivo
+- Cerrar capa 2 para integracion final de sistema.
+
+Tareas
+1) Casos nominales: healthy, warning, critical.
+2) Casos adversos: input incompleto, ruido extremo, conflicto de evidencia.
+3) Pruebas de contrato end-to-end con capa 1 y dashboard.
+4) Criterios Go/No-Go para produccion interna.
+5) Pruebas de asistente de escenarios:
+   - prompts ambiguos
+   - escenarios extremos
+   - validacion de rangos y rechazos seguros
+
+Entregables
+- `out/agent_layer/08_test_matrix.txt`
+- `out/agent_layer/08_failure_modes.txt`
+- `out/agent_layer/08_acceptance_criteria.txt`
+
+Criterio de salida
+- Capa 2 validada como componente de decision.
+
+Orden recomendado
+1) Fase 1
+2) Fase 2
+3) Fase 3
+4) Fase 5
+5) Fase 6
+6) Fase 4
+7) Fase 7
+8) Fase 8
+
+Tiempo estimado (1-2 personas)
+- Fase 1-3: 3-5 dias
+- Fase 5-6: 2-3 dias
+- Fase 4 y 7-8: 3-5 dias
+- Total: 8-13 dias
+
+Definicion de exito
+- La app no solo predice RUL: decide riesgo y recomienda acciones con trazabilidad.
+- `dashboard` permanece estable mientras `agent_layer` evoluciona internamente.
+- `agent_layer` consume `predictive_layer` por contrato y no por acoplamiento a mocks de UI.
+- El asistente de escenarios mejora interactividad sin romper seguridad, contratos ni latencia objetivo.

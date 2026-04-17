@@ -6,12 +6,17 @@ from pathlib import Path
 from typing import Any, Dict, List
 from uuid import uuid4
 
-from dashboard.mock.service import ValidationError, generate_history
-
 from .multimodal_extractor import extract_evidence_stub, summarize_evidence
 from .recommender import build_recommendation
 from .risk_engine import compute_risk_decision
-from .tools import tool_dashboard_explainer, tool_read_model_output, tool_read_policy
+from .scenario_assistant import compare_decisions, propose_scenario
+from .tools import (
+    generate_history,
+    tool_dashboard_explainer,
+    tool_read_model_output,
+    tool_read_policy,
+    validate_input_payload,
+)
 
 
 AUDIT_DIR = Path(__file__).resolve().parents[2] / "out" / "agent_layer"
@@ -25,17 +30,18 @@ def _write_audit(record: Dict[str, Any]) -> None:
 
 
 def orchestrate_prediction(input_payload: Dict[str, Any]) -> Dict[str, Any]:
+    validate_input_payload(input_payload)
     model_output = tool_read_model_output(input_payload)
     history: List[Dict[str, float]] = generate_history(
         cycle=input_payload["cycle"], rul_pred=model_output["rul_pred"], length=30
     )
 
-    policy = tool_read_policy()
+    thresholds = tool_read_policy()
     risk_decision = compute_risk_decision(
         rul_pred=model_output["rul_pred"],
         confidence_band=model_output["confidence_band"],
         history=history,
-        thresholds=policy["risk_thresholds"],
+        thresholds=thresholds,
     )
     recommendation = build_recommendation(
         risk_level=risk_decision["risk_level"],
@@ -60,7 +66,7 @@ def orchestrate_prediction(input_payload: Dict[str, Any]) -> Dict[str, Any]:
         "dashboard_note": dashboard_note,
         "audit_record_id": audit_record_id,
         "evidence_summary": summarize_evidence(evidence["evidence_items"]),
-        "service_status": "ok",
+        "service_status": model_output.get("service_status", "ok"),
     }
 
     _write_audit(
@@ -83,3 +89,29 @@ def orchestrate_prediction(input_payload: Dict[str, Any]) -> Dict[str, Any]:
     )
     output["history"] = history
     return output
+
+
+def orchestrate_scenario(
+    scenario_prompt: str,
+    base_payload: Dict[str, Any],
+    constraints: Dict[str, Any] | None = None,
+) -> Dict[str, Any]:
+    """Contract D orchestration: propose scenario + run comparison."""
+    validate_input_payload(base_payload)
+    scenario = propose_scenario(
+        scenario_prompt=scenario_prompt,
+        base_payload=base_payload,
+        constraints=constraints,
+    )
+
+    proposed_payload = scenario["proposed_payload"]
+    baseline_result = orchestrate_prediction(base_payload)
+    scenario_result = orchestrate_prediction(proposed_payload)
+    comparison = compare_decisions(baseline_result, scenario_result)
+
+    return {
+        **scenario,
+        "baseline_result": baseline_result,
+        "scenario_result": scenario_result,
+        "comparison": comparison,
+    }

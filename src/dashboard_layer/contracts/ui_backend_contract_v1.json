@@ -1,0 +1,30 @@
+{
+  "schema_version": "v1",
+  "input": {
+    "dataset_id": "str",
+    "unit_id": "int>=1",
+    "cycle": "int>=1",
+    "op_settings": "list[float] len=3",
+    "sensors": "list[float] len=21",
+    "source": "manual|csv|api"
+  },
+  "output": {
+    "rul_pred": "float>=0",
+    "confidence_band": {
+      "low": "float>=0",
+      "high": "float>=0"
+    },
+    "risk_level": "healthy|warning|critical",
+    "risk_score": "float in [0,100]",
+    "recommendation_text": "str",
+    "recommendation_priority": "low|high|urgent",
+    "recommendation_alternatives": "list[str]",
+    "rationale": "list[str]",
+    "evidence_summary": "str",
+    "audit_record_id": "str",
+    "service_status": "ok|degraded",
+    "timestamp": "iso8601",
+    "history": "optional[list[dict]]",
+    "dashboard_note": "optional[str]"
+  }
+}

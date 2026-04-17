@@ -1,0 +1,238 @@
+PLAN 5 - DASHBOARD LAYER FINAL (PRODUCTO) EN `src/dashboard_layer`
+
+Resumen
+- Este plan define la capa final de dashboard como producto integrador de la app.
+- El dashboard final no vive en `dashboard/` (mock), vive en `src/dashboard_layer/`.
+- El mock actual se usa como baseline de migracion, no como entregable final.
+- Incluye una experiencia interactiva de escenarios what-if asistida por LLM (via capa 2).
+
+Objetivo general
+- Construir un dashboard final, estable y desplegable, que consuma contratos reales:
+  - `predictive_layer` (RUL + incertidumbre)
+  - `agent_layer` (riesgo + recomendacion + trazabilidad)
+- Mantener resiliencia con estado `degraded` controlado sin romper la UI.
+- Permitir al usuario explorar escenarios:
+  - describir un cambio en lenguaje natural
+  - validar propuesta del asistente
+  - relanzar pronostico y comparar con baseline
+
+Alcance final (no mock)
+- UI final de operacion PHM.
+- Integracion por contratos versionados.
+- Manejo de estados operativos y errores.
+- Evidencia de calidad (QA funcional, UX, regresion, smoke cloud).
+
+Arquitectura objetivo
+1) Layer 1: `src/predictive_layer/`
+2) Layer 2: `src/agent_layer/`
+3) Layer 3: `src/dashboard_layer/`
+
+Estructura de carpetas objetivo para capa 3
+- `src/dashboard_layer/app.py`
+- `src/dashboard_layer/components.py`
+- `src/dashboard_layer/backend_adapter.py`
+- `src/dashboard_layer/contracts/`
+- `src/dashboard_layer/assets/`
+- `out/dashboard_layer/`
+
+Contratos que debe consumir el dashboard final
+1) Ingreso desde UI (manual/csv/txt)
+- `dataset_id`, `unit_id`, `cycle`
+- `op_settings` (len=3), `sensors` (len=21), `source`
+
+2) Salida esperada desde agent layer
+- `rul_pred`
+- `confidence_band`
+- `risk_level`, `risk_score`
+- `recommendation_text`, `recommendation_priority`, `recommendation_alternatives`
+- `rationale`, `evidence_summary`
+- `audit_record_id`
+- `service_status`
+- `timestamp`
+- `history` (opcional, para tab Historico)
+- `dashboard_note` (opcional, para explicacion breve en UI)
+
+2b) Salida esperada del asistente de escenarios (agent layer)
+- `proposed_payload`
+- `change_summary`
+- `assumptions`
+- `safety_notes`
+- `service_status`
+
+3) Estados de aplicacion obligatorios
+- `sin_datos`
+- `loading`
+- `ok`
+- `error_validacion`
+- `degraded`
+
+Precondiciones
+1) Entorno:
+   `conda activate cmapss`
+2) Plan 3 ejecutado (predictive layer con contratos publicados). Estado actual: cumplido.
+3) Plan 4 ejecutado (agent layer con orquestacion y contrato C vigente). Estado actual: cumplido.
+4) Mock dashboard existente operativo como baseline de migracion.
+
+FASE 1 - Definicion final de producto y contratos UI
+Objetivo
+- Congelar alcance del dashboard final antes de migrar codigo.
+
+Tareas
+1) Definir user journeys finales (operador, analista, mantenedor).
+2) Definir mapa de pantallas final:
+   - Resumen
+   - Detalle
+   - Historico
+   - Recomendaciones
+   - Trazabilidad (audit/evidence)
+   - Escenarios (asistente + comparacion baseline vs escenario)
+3) Congelar contrato UI <-> backend_adapter.
+4) Definir politicas de mensajes para `ok/degraded/error_validacion/sin_datos`.
+
+Entregables
+- `out/dashboard_layer/01_user_flows_final.txt`
+- `out/dashboard_layer/01_screen_map_final.txt`
+- `out/dashboard_layer/01_ui_backend_contract_v1.json`
+
+Criterio de salida
+- Alcance final aprobado; sin ambiguedades de contrato.
+
+FASE 2 - Migracion tecnica a `src/dashboard_layer`
+Objetivo
+- Mover y reorganizar el dashboard desde el mock actual hacia la ubicacion final.
+
+Tareas
+1) Crear `src/dashboard_layer/` y subcarpetas.
+2) Migrar logica desde `dashboard/` a `src/dashboard_layer/`.
+3) Eliminar dependencias directas a `dashboard.mock.*` en la ruta principal.
+4) Dejar compatibilidad temporal con modo `degraded` sin datos sinteticos si capa 2 no responde.
+
+Entregables
+- `src/dashboard_layer/app.py`
+- `src/dashboard_layer/components.py`
+- `src/dashboard_layer/backend_adapter.py`
+- `out/dashboard_layer/02_migration_notes.txt`
+
+Criterio de salida
+- App corre desde `src/dashboard_layer/app.py` localmente.
+
+FASE 3 - Integracion real con capas 1 y 2
+Objetivo
+- Conectar dashboard final al flujo real de negocio.
+
+Tareas
+1) Adapter primario: llamada a `agent_layer.orchestrate_prediction`.
+2) Verificar y documentar que `agent_layer` consume `predictive_layer` por contrato (ya implementado).
+3) Validar parseo de entrada manual/csv/txt y mapeo a contrato.
+4) Versionar contrato de respuesta consumido por componentes UI.
+5) Integrar endpoint/funcion de asistente de escenarios de capa 2.
+6) Implementar comparacion estructurada:
+   - baseline_result
+   - scenario_result
+   - delta_rul, delta_risk_score, cambio de recomendacion
+
+Entregables
+- `out/dashboard_layer/03_integration_contract_check.txt`
+- `out/dashboard_layer/03_mapping_fields_table.csv`
+- `out/dashboard_layer/03_smoke_local.txt`
+- `out/dashboard_layer/03_scenario_assistant_contract_check.txt`
+- `out/dashboard_layer/03_baseline_vs_scenario_template.json`
+
+Criterio de salida
+- Flujo E2E local: input -> predictive -> agent -> dashboard.
+
+FASE 4 - UX operacional y explicabilidad
+Objetivo
+- Presentar decision tecnica de forma util y auditada.
+
+Tareas
+1) Resumen: KPIs RUL, riesgo, confianza, estado de servicio.
+2) Detalle: payload de entrada + rationale estructurado.
+3) Historico: tendencia de degradacion sin saltos absurdos.
+4) Recomendaciones: accion principal, alternativas, prioridad, evidencia.
+5) Trazabilidad: `audit_record_id`, timestamp, estado de servicio.
+6) Escenarios:
+   - caja de texto para prompt de escenario
+   - vista diff de cambios propuestos
+   - boton de confirmacion para rerun
+   - comparacion baseline vs escenario
+
+Entregables
+- `out/dashboard_layer/04_ux_copy_guide.txt`
+- `out/dashboard_layer/04_explainability_rules.txt`
+- `out/dashboard_layer/04_scenario_ux_rules.txt`
+
+Criterio de salida
+- Usuario entiende que se decidio y por que se decidio.
+
+FASE 5 - QA funcional y no funcional
+Objetivo
+- Validar que el dashboard final es confiable para demo y entrega.
+
+Tareas
+1) Pruebas funcionales por modo de entrada (manual/csv/txt).
+2) Pruebas de contrato y regresion UI.
+3) Pruebas de estados: `loading/error_validacion/degraded/sin_datos/ok`.
+4) Medir tiempo percibido y rendimiento base.
+5) Verificar robustez ante errores de capa 2.
+6) Pruebas de escenarios asistidos:
+   - prompts claros/ambiguos
+   - intentos fuera de rango
+   - rechazo seguro + mensajes de guardrail
+
+Entregables
+- `out/dashboard_layer/05_test_matrix.txt`
+- `out/dashboard_layer/05_bug_log.txt`
+- `out/dashboard_layer/05_acceptance_checklist.txt`
+- `out/dashboard_layer/05_scenario_test_report.txt`
+
+Criterio de salida
+- Checklist de aceptacion en verde para demo final.
+
+FASE 6 - Preparacion de despliegue y operacion en nube
+Objetivo
+- Dejar el dashboard final listo para Streamlit Cloud.
+
+Tareas
+1) Definir entrypoint oficial (`src/dashboard_layer/app.py`).
+2) Asegurar dependencias completas en `requirements.txt`.
+3) Definir manejo de secretos (ej. `GEMINI_API_KEY`) sin hardcode.
+4) Ejecutar smoke test de despliegue y documentar incidencias.
+5) Registrar playbook de rollback/degraded (sin proveedor mock en produccion).
+6) Definir feature flag para asistente:
+   - habilitado/deshabilitado por entorno
+   - fallback UI cuando LLM no este disponible
+
+Entregables
+- `out/dashboard_layer/06_deploy_checklist.txt`
+- `out/dashboard_layer/06_cloud_smoke_report.txt`
+- `out/dashboard_layer/06_runtime_config_notes.txt`
+- `out/dashboard_layer/06_scenario_feature_flag_policy.txt`
+
+Criterio de salida
+- App desplegada y funcional en nube con manejo `degraded` operativo.
+
+Orden recomendado
+1) Fase 1
+2) Fase 2
+3) Fase 3
+4) Fase 4
+5) Fase 5
+6) Fase 6
+
+Tiempo estimado (1-2 personas)
+- Fase 1-2: 1-2 dias
+- Fase 3-4: 2-3 dias
+- Fase 5-6: 1-2 dias
+- Total: 4-7 dias
+
+Definicion de exito
+- El dashboard final vive en `src/dashboard_layer` y no depende del mock como ruta principal.
+- El flujo end-to-end usa contratos reales de `predictive_layer` y `agent_layer`.
+- La app comunica riesgo y recomendaciones con trazabilidad y resiliencia operativa.
+- No depende de proveedores mock para respuestas de produccion.
+- El usuario puede explorar escenarios what-if y comparar resultados de forma segura y explicable.
+
+Nota de iteracion
+- Este plan queda actualizado en version post-plan4-ejecucion.
+- Ajustes pendientes esperados: performance fina en nube y endurecimiento UX de estado `degraded`.
