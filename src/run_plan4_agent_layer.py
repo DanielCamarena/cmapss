@@ -50,7 +50,7 @@ def _phase_1_contracts() -> None:
             "recommendation_priority": "low|high|urgent",
             "recommendation_alternatives": "list[str]",
             "rationale": "list[str]",
-            "evidence_summary": "str",
+            "assistant_mode": "optional[rules_only|llm_enabled]",
             "audit_record_id": "str",
             "service_status": "ok|degraded|fallback",
             "timestamp": "iso8601",
@@ -70,7 +70,7 @@ def _phase_1_contracts() -> None:
             "assumptions": "list[str]",
             "safety_notes": "list[str]",
             "service_status": "ok|degraded|fallback",
-            "assistant_mode": "rules_only|llm_hybrid",
+            "assistant_mode": "rules_only|llm_enabled",
             "baseline_result": "optional[contract C decision]",
             "scenario_result": "optional[contract C decision]",
             "comparison": "optional[dict]",
@@ -164,35 +164,29 @@ def _phase_3_toolchain_file() -> None:
     )
 
 
-def _phase_4_multimodal_files() -> None:
-    _write_json(
-        OUT_AGENT / "04_evidence_schema.json",
-        {
-            "schema_version": "v1",
-            "evidence_items": [{"type": "text|table|image", "source": "str", "confidence": "float[0,1]"}],
-            "evidence_summary": "str",
-        },
-    )
+def _phase_4_tool_use_and_modes() -> None:
     _write_text(
-        OUT_AGENT / "04_extraction_rules.txt",
+        OUT_AGENT / "04_tool_use_policy.txt",
         "\n".join(
             [
-                "Extraction rules",
-                "================",
-                "- Normalize source metadata.",
-                "- Keep extraction deterministic when parser confidence is low.",
-                "- If extraction fails, return empty evidence with explicit note.",
+                "Tool Use and Assistant Mode Policy",
+                "==================================",
+                "Primary scenario path: deterministic parser + bounded payload edits.",
+                "If GEMINI_API_KEY is configured: enable llm_enabled mode for scenario enrichment.",
+                "If LLM request fails: fallback to rules_only and keep service_status=fallback.",
+                "dataset_id and unit_id remain locked unless constraints explicitly allow changes.",
             ]
         ),
     )
     _write_text(
-        OUT_AGENT / "04_tool_interfaces.txt",
+        OUT_AGENT / "04_llm_usage_scope.txt",
         "\n".join(
             [
-                "Multimodal tool interfaces",
-                "==========================",
-                "extract_evidence_stub() -> evidence payload",
-                "summarize_evidence(evidence_items) -> evidence_summary",
+                "LLM usage scope",
+                "===============",
+                "1) Scenario prompt enrichment (optional).",
+                "2) Scenario comparison interpretation (optional).",
+                "3) Core risk scoring remains deterministic.",
             ]
         ),
     )
@@ -455,7 +449,7 @@ def main() -> None:
     _phase_1_contracts()
     _phase_2_risk_files()
     _phase_3_toolchain_file()
-    _phase_4_multimodal_files()
+    _phase_4_tool_use_and_modes()
     _phase_5_recommendation_files()
     _phase_6_dashboard_mapping_files()
     _phase_7_llm_files()

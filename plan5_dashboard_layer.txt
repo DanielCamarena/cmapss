@@ -155,12 +155,13 @@ Tareas
    - caja de texto para prompt de escenario
    - vista diff de cambios propuestos
    - boton de confirmacion para rerun
-   - comparacion baseline vs escenario
+   - comparacion baseline vs escenario (tabla/json + grafico comparativo RUL/Risk Score)
 
 Entregables
 - `out/dashboard_layer/04_ux_copy_guide.txt`
 - `out/dashboard_layer/04_explainability_rules.txt`
 - `out/dashboard_layer/04_scenario_ux_rules.txt`
+- `out/dashboard_layer/04_scenario_visual_spec.txt`
 
 Criterio de salida
 - Usuario entiende que se decidio y por que se decidio.

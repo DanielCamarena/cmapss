@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 from datetime import datetime, timezone
@@ -6,10 +6,10 @@ from pathlib import Path
 from typing import Any, Dict, List
 from uuid import uuid4
 
-from .multimodal_extractor import extract_evidence_stub, summarize_evidence
 from .recommender import build_recommendation
 from .risk_engine import compute_risk_decision
 from .scenario_assistant import compare_decisions, propose_scenario
+from .scenario_interpreter import build_comparison_interpretation
 from .tools import (
     generate_history,
     tool_dashboard_explainer,
@@ -48,7 +48,6 @@ def orchestrate_prediction(input_payload: Dict[str, Any]) -> Dict[str, Any]:
         risk_score=risk_decision["risk_score"],
         uncertainty_score=risk_decision["uncertainty_score"],
     )
-    evidence = extract_evidence_stub()
 
     audit_record_id = f"AR-{uuid4().hex[:10].upper()}"
     dashboard_note = tool_dashboard_explainer(
@@ -65,7 +64,6 @@ def orchestrate_prediction(input_payload: Dict[str, Any]) -> Dict[str, Any]:
         "rationale": risk_decision["rationale"],
         "dashboard_note": dashboard_note,
         "audit_record_id": audit_record_id,
-        "evidence_summary": summarize_evidence(evidence["evidence_items"]),
         "service_status": model_output.get("service_status", "ok"),
     }
 
@@ -109,8 +107,15 @@ def orchestrate_scenario(
     scenario_result = orchestrate_prediction(proposed_payload)
     comparison = compare_decisions(baseline_result, scenario_result)
 
+    interpretation = build_comparison_interpretation(
+        scenario_prompt=scenario_prompt,
+        comparison=comparison,
+        assistant_mode=scenario.get("assistant_mode", "rules_only"),
+    )
+
     return {
         **scenario,
+        **interpretation,
         "baseline_result": baseline_result,
         "scenario_result": scenario_result,
         "comparison": comparison,

@@ -14,3 +14,5 @@ dependencies:
   - streamlit
   - plotly
   - pip
+  - pip:
+      - google-genai==1.47.0

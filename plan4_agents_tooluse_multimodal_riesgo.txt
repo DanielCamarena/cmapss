@@ -1,4 +1,4 @@
-PLAN 4 - AGENT LAYER (TOOL USE + MULTIMODAL) PARA LOGICA DE RIESGO Y RECOMENDACIONES
+PLAN 4 - AGENT LAYER (TOOL USE + LLM) PARA LOGICA DE RIESGO Y RECOMENDACIONES
 ENFOQUE: CONTRACT-FIRST, DESACOPLADO DE IMPLEMENTACIONES INTERNAS
 
 Resumen
@@ -6,6 +6,10 @@ Resumen
 - La capa 2 NO debe depender de `dashboard.mock.*`.
 - Flujo objetivo: dashboard input -> predictive_layer output -> agent_layer decision -> dashboard render.
 - Extension objetivo: asistente LLM para construir escenarios "what-if" y relanzar pronostico.
+- Transporte LLM implementado: SDK oficial `google-genai` (sin `urllib`).
+- Operacion en doble modo obligatoria:
+  - `rules_only` (sin LLM disponible)
+  - `llm_enabled` (LLM disponible con `GEMINI_API_KEY`)
 
 Objetivo general
 - Convertir prediccion de RUL en:
@@ -45,7 +49,7 @@ Contratos (obligatorio, version v1)
 - recommendation_priority
 - recommendation_alternatives
 - rationale
-- evidence_summary
+- llm_summary (opcional)
 - audit_record_id
 - service_status (ok/degraded/fallback)
 - timestamp
@@ -60,6 +64,10 @@ Contratos (obligatorio, version v1)
   - `change_summary` (lista de cambios aplicados)
   - `assumptions`
   - `safety_notes`
+  - `comparison_interpretation` (resumen ejecutivo de impacto: favorable/desfavorable/mixto)
+  - `operator_guidance` (accion sugerida post-comparacion)
+  - `assistant_mode` (`rules_only` | `llm_enabled`)
+  - `llm_model_used` (opcional, modelo Gemini realmente usado en la ejecucion)
   - `service_status` (ok/degraded/fallback)
 
 Precondiciones
@@ -137,26 +145,7 @@ Entregables
 Criterio de salida
 - Capa 2 funciona aun si se desactiva `dashboard.mock.service`.
 
-FASE 4 - Multimodal extraction (incremental)
-Objetivo
-- Anexar evidencia contextual sin romper contratos.
-
-Tareas
-1) Definir evidencia permitida: PDF, CSV/XLSX, imagen.
-2) Extraer entidades y normalizar.
-3) Resumir evidencia para UI.
-4) Definir confianza de evidencia.
-
-Entregables
-- `src/agent_layer/multimodal_extractor.py`
-- `out/agent_layer/04_evidence_schema.json`
-- `out/agent_layer/04_extraction_rules.txt`
-- `out/agent_layer/04_tool_interfaces.txt`
-
-Criterio de salida
-- `evidence_summary` disponible sin romper contrato C.
-
-FASE 5 - Recomendaciones accionables
+FASE 4 - Recomendaciones accionables
 Objetivo
 - Traducir riesgo en accion operativa clara.
 
@@ -168,13 +157,13 @@ Tareas
 
 Entregables
 - `src/agent_layer/recommender.py`
-- `out/agent_layer/05_recommendation_templates.txt`
-- `out/agent_layer/05_priority_matrix.csv`
+- `out/agent_layer/04_recommendation_templates.txt`
+- `out/agent_layer/04_priority_matrix.csv`
 
 Criterio de salida
 - Recomendaciones consistentes entre casos equivalentes.
 
-FASE 6 - Integracion dashboard (contrato estable)
+FASE 5 - Integracion dashboard (contrato estable)
 Objetivo
 - Integrar capa 2 con dashboard sin acoplar UI a internals.
 
@@ -187,56 +176,68 @@ Tareas
 4) Pruebas de regresion UI con entradas manual/CSV/TXT.
 5) Integrar flujo de escenarios:
    - baseline -> propuesta LLM -> confirmacion usuario -> rerun -> comparacion
+6) Integrar y exponer modo dual en UI:
+   - indicador de modo activo (`rules_only`/`llm_enabled`)
+   - mensajes claros cuando LLM no este disponible
+7) Exponer interpretacion de comparacion para operario:
+   - impacto neto en RUL/risk_score
+   - lectura operativa en lenguaje natural
 
 Entregables
-- `out/agent_layer/06_dashboard_mapping.txt`
-- `out/agent_layer/06_explainability_checklist.txt`
+- `out/agent_layer/05_dashboard_mapping.txt`
+- `out/agent_layer/05_explainability_checklist.txt`
 - `out/dashboard_layer/contract_integration_checklist.txt`
-- `out/agent_layer/06_scenario_assistant_flow.txt`
-- `out/agent_layer/06_comparison_payload_schema.json`
+- `out/agent_layer/05_scenario_assistant_flow.txt`
+- `out/agent_layer/05_comparison_payload_schema.json`
+- `out/agent_layer/05_dual_mode_policy.txt`
 
 Criterio de salida
 - Dashboard comunica riesgo + recomendacion + explicacion, con fallback operativo.
 
-FASE 7 - LLM real (uso selectivo y seguro)
+FASE 6 - LLM real (implementacion obligatoria, uso selectivo y seguro)
 Objetivo
-- Incorporar LLM donde agregue valor, sin perder control.
+- Incorporar LLM real en la capa 2 sin perder control ni trazabilidad.
 
 Tareas
 1) Mantener motor deterministico como base de verdad.
 2) Usar LLM solo para:
    - redaccion natural de recomendacion
    - enriquecimiento textual de rationale
-   - resumen ejecutivo de evidencia
+   - resumen ejecutivo del estado de riesgo/prediccion
    - propuesta de escenarios what-if (contract D)
 3) Definir politicas operativas:
    - proveedor/modelo
    - `GEMINI_API_KEY` (local + nube)
+   - `GEMINI_MODEL` opcional (override)
    - timeout, retries, costo maximo
 4) Fallback obligatorio:
    - si falla LLM -> salida por reglas + `service_status=fallback`
+   - registrar `assistant_mode=rules_only` en salida para trazabilidad
 5) Guardrails de escenario:
    - no permitir cambios fuera de rango
    - no mutar campos bloqueados (dataset_id/unit_id) sin confirmacion explicita
    - siempre mostrar diff entre payload base y propuesto
 
 Entregables
-- `out/agent_layer/07_engine_decision_record.txt`
-- `out/agent_layer/07_llm_integration_policy.txt`
-- `out/agent_layer/07_nonfunctional_requirements.txt`
-- `out/agent_layer/07_scenario_assistant_policy.txt`
-- `out/agent_layer/07_prompt_templates_scenarios.txt`
+- `src/agent_layer/llm_client.py`
+- `src/agent_layer/scenario_interpreter.py`
+- `out/agent_layer/06_engine_decision_record.txt`
+- `out/agent_layer/06_llm_integration_policy.txt`
+- `out/agent_layer/06_nonfunctional_requirements.txt`
+- `out/agent_layer/06_scenario_assistant_policy.txt`
+- `out/agent_layer/06_prompt_templates_scenarios.txt`
+- `out/agent_layer/06_interpretation_templates.txt`
 
 Criterio de salida
 - LLM no bloquea operacion ni rompe contratos.
 
-FASE 8 - Validacion final y hardening
+FASE 7 - Validacion final y hardening
 Objetivo
 - Cerrar capa 2 para integracion final de sistema.
 
 Tareas
 1) Casos nominales: healthy, warning, critical.
-2) Casos adversos: input incompleto, ruido extremo, conflicto de evidencia.
+2) Casos adversos: input incompleto, ruido extremo, falla de LLM.
 3) Pruebas de contrato end-to-end con capa 1 y dashboard.
 4) Criterios Go/No-Go para produccion interna.
 5) Pruebas de asistente de escenarios:
@@ -245,9 +246,9 @@ Tareas
    - validacion de rangos y rechazos seguros
 
 Entregables
-- `out/agent_layer/08_test_matrix.txt`
-- `out/agent_layer/08_failure_modes.txt`
-- `out/agent_layer/08_acceptance_criteria.txt`
+- `out/agent_layer/07_test_matrix.txt`
+- `out/agent_layer/07_failure_modes.txt`
+- `out/agent_layer/07_acceptance_criteria.txt`
 
 Criterio de salida
 - Capa 2 validada como componente de decision.
@@ -256,20 +257,20 @@ Orden recomendado
 1) Fase 1
 2) Fase 2
 3) Fase 3
-4) Fase 5
-5) Fase 6
-6) Fase 4
+4) Fase 4
+5) Fase 5
+6) Fase 6
 7) Fase 7
-8) Fase 8
 
 Tiempo estimado (1-2 personas)
 - Fase 1-3: 3-5 dias
-- Fase 5-6: 2-3 dias
-- Fase 4 y 7-8: 3-5 dias
-- Total: 8-13 dias
+- Fase 4-5: 2-3 dias
+- Fase 6-7: 3-5 dias
+- Total: 8-12 dias
 
 Definicion de exito
 - La app no solo predice RUL: decide riesgo y recomienda acciones con trazabilidad.
 - `dashboard` permanece estable mientras `agent_layer` evoluciona internamente.
 - `agent_layer` consume `predictive_layer` por contrato y no por acoplamiento a mocks de UI.
-- El asistente de escenarios mejora interactividad sin romper seguridad, contratos ni latencia objetivo.
+- El asistente de escenarios con LLM real mejora interactividad sin romper seguridad, contratos ni latencia objetivo.
+- El sistema opera correctamente en doble modo (`rules_only`/`llm_enabled`) y siempre entrega interpretacion accionable al operario.

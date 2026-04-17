@@ -114,15 +114,10 @@ streamlit run src/dashboard_layer/app.py
 Guia rapida de uso:
 - Ver `GUIA_RAPIDA_DASHBOARD.md`.
 
-## Despliegue en Streamlit Cloud
-
-- Repository: este repositorio
-- Branch: `main`
-- Main file path: `src/dashboard_layer/app.py`
-
 ## Configuracion de API Key (Gemini)
 
 Si habilitas LLM real en `agent_layer`, usa `GEMINI_API_KEY` como variable de entorno.
+La implementacion actual usa el SDK oficial `google-genai`.
 
 ### Local (PowerShell)
 
@@ -130,30 +125,33 @@ Temporal (solo sesion actual):
 
 ```powershell
 $env:GEMINI_API_KEY="tu_api_key_aqui"
+# Opcional: override del modelo (si no se define, se usa default interno + fallback)
+# $env:GEMINI_MODEL="gemini-2.5-flash"
 ```
 
 Persistente para usuario actual:
 
 ```powershell
 setx GEMINI_API_KEY "tu_api_key_aqui"
+# Opcional
+# setx GEMINI_MODEL "gemini-2.5-flash"
 ```
 
 Luego abre una nueva terminal para que tome el valor persistente.
 
-### Streamlit Cloud
-
-1. Entra a la app en Streamlit Cloud.
-2. Ve a `Settings` -> `Secrets`.
-3. Agrega:
-
-```toml
-GEMINI_API_KEY = "tu_api_key_aqui"
-```
-
-4. Guarda y reinicia/redeploy la app.
-
 Regla de seguridad:
 - Nunca hardcodear API keys en codigo o repositorio.
+
+Notas de modelo:
+- `GEMINI_MODEL` es opcional. Si no lo defines, se usa el default interno.
+- Si `GEMINI_MODEL` no existe o fue retirado, la capa 2 intenta fallback automatico con:
+  - `gemini-2.5-flash`
+  - `gemini-2.5-flash-lite`
+  - `gemini-3-flash-preview`
+- En la pestaña `Scenarios`, la UI muestra `LLM model used` cuando el modo es `llm_enabled`.
+
+Dependencia SDK:
+- `google-genai` (incluida en `requirements.txt` y `environment.yml`).
 
 ## Estado actual
 
@@ -164,3 +162,4 @@ Regla de seguridad:
   - smoke en nube,
   - endurecimiento de pruebas automaticas,
   - multimodal y LLM real (si se decide activar).
+  - nota: la evidencia multimodal externa no se muestra en UI operativa actualmente; queda como roadmap.

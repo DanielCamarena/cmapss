@@ -88,15 +88,18 @@ pip install -r requirements.txt
 ## 7) Configurar GEMINI_API_KEY (opcional)
 
 Solo necesario si habilitas funciones LLM reales en capa 2.
+La capa 2 usa el SDK oficial `google-genai` (ya incluido en dependencias del proyecto).
 
 Local (PowerShell, sesion actual):
 ```powershell
 $env:GEMINI_API_KEY="tu_api_key_aqui"
+$env:GEMINI_MODEL="gemini-2.5-flash"
 ```
 
 Local persistente:
 ```powershell
 setx GEMINI_API_KEY "tu_api_key_aqui"
+setx GEMINI_MODEL "gemini-2.5-flash"
 ```
 
 Streamlit Cloud:
@@ -104,5 +107,11 @@ Streamlit Cloud:
 2. Agregar:
 ```toml
 GEMINI_API_KEY = "tu_api_key_aqui"
+GEMINI_MODEL = "gemini-2.5-flash"
 ```
 3. Guardar y redeploy.
+
+Si `GEMINI_MODEL` no existe o fue retirado, el sistema intenta fallback automatico a:
+- `gemini-2.5-flash`
+- `gemini-2.5-flash-lite`
+- `gemini-3-flash-preview`

@@ -1,7 +1,9 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import re
 from typing import Any, Dict, List, Tuple
+
+from .llm_client import LLMClientError, is_llm_enabled, propose_scenario_patch
 
 
 def _clamp(value: float, low: float, high: float) -> float:
@@ -93,7 +95,6 @@ def _apply_operational_rules(
         assumptions.append("Applied low-load scenario defaults.")
         changed = True
 
-    # Direct command patterns: sensor_5 +10, op_setting_2 -0.3
     for m in re.finditer(r"(sensor_(\d{1,2})|op_setting_(\d))\s*([+-]\s*\d+(?:\.\d+)?)", prompt_l):
         field = m.group(1)
         idx = int(m.group(2) or m.group(3))
@@ -110,6 +111,78 @@ def _apply_operational_rules(
             changed = True
 
     return ops, sens, changed
+
+
+def _apply_llm_patch(
+    llm_patch: Dict[str, Any],
+    proposed: Dict[str, Any],
+    cfg: Dict[str, Any],
+    assumptions: List[str],
+    safety_notes: List[str],
+) -> bool:
+    changed = False
+
+    cycle_delta = llm_patch.get("cycle_delta", 0)
+    try:
+        cycle_delta_f = float(cycle_delta)
+    except (TypeError, ValueError):
+        cycle_delta_f = 0.0
+
+    if abs(cycle_delta_f) > 0:
+        bounded = _clamp(cycle_delta_f, -cfg["cycle_delta_max"], cfg["cycle_delta_max"])
+        next_cycle = int(_clamp(proposed["cycle"] + bounded, cfg["cycle_min"], cfg["cycle_max"]))
+        if next_cycle != proposed["cycle"]:
+            proposed["cycle"] = next_cycle
+            assumptions.append(f"LLM patch applied on cycle with delta {bounded:+.0f}.")
+            changed = True
+
+    op_deltas = llm_patch.get("op_setting_deltas", {})
+    if isinstance(op_deltas, dict):
+        for k, v in op_deltas.items():
+            try:
+                idx = int(k)
+                delta = float(v)
+            except (TypeError, ValueError):
+                continue
+            if 1 <= idx <= 3:
+                bounded = _clamp(delta, -cfg["op_setting_delta_max"], cfg["op_setting_delta_max"])
+                old = proposed["op_settings"][idx - 1]
+                proposed["op_settings"][idx - 1] = _clamp(
+                    old + bounded,
+                    cfg["op_setting_min"],
+                    cfg["op_setting_max"],
+                )
+                if abs(old - proposed["op_settings"][idx - 1]) > 1e-9:
+                    changed = True
+
+    sensor_deltas = llm_patch.get("sensor_deltas", {})
+    if isinstance(sensor_deltas, dict):
+        for k, v in sensor_deltas.items():
+            try:
+                idx = int(k)
+                delta = float(v)
+            except (TypeError, ValueError):
+                continue
+            if 1 <= idx <= 21:
+                bounded = _clamp(delta, -cfg["sensor_delta_max"], cfg["sensor_delta_max"])
+                old = proposed["sensors"][idx - 1]
+                proposed["sensors"][idx - 1] = _clamp(
+                    old + bounded,
+                    cfg["sensor_min"],
+                    cfg["sensor_max"],
+                )
+                if abs(old - proposed["sensors"][idx - 1]) > 1e-9:
+                    changed = True
+
+    llm_assumptions = llm_patch.get("assumptions", [])
+    if isinstance(llm_assumptions, list):
+        assumptions.extend([str(x) for x in llm_assumptions if str(x).strip()])
+
+    llm_safety = llm_patch.get("safety_notes", [])
+    if isinstance(llm_safety, list):
+        safety_notes.extend([str(x) for x in llm_safety if str(x).strip()])
+
+    return changed
 
 
 def _diff_payload(base_payload: Dict[str, Any], proposed_payload: Dict[str, Any]) -> List[str]:
@@ -140,6 +213,9 @@ def propose_scenario(
     prompt_l = scenario_prompt.lower()
     assumptions: List[str] = []
     safety_notes: List[str] = []
+    assistant_mode = "rules_only"
+    service_status = "ok"
+    llm_model_used = None
 
     proposed = {
         "dataset_id": base_payload["dataset_id"],
@@ -150,24 +226,47 @@ def propose_scenario(
         "source": "api",
     }
 
-    # ID fields are locked by default.
     if not cfg.get("allow_id_changes", False):
         safety_notes.append("dataset_id and unit_id are locked by policy.")
 
-    next_cycle, cycle_changed = _apply_cycle_rule(
-        prompt_l, proposed["cycle"], cfg, assumptions
-    )
+    next_cycle, cycle_changed = _apply_cycle_rule(prompt_l, proposed["cycle"], cfg, assumptions)
     proposed["cycle"] = next_cycle
 
     next_ops, next_sens, op_changed = _apply_operational_rules(
-        prompt_l, proposed["op_settings"], proposed["sensors"], cfg, assumptions
+        prompt_l,
+        proposed["op_settings"],
+        proposed["sensors"],
+        cfg,
+        assumptions,
     )
     proposed["op_settings"] = next_ops
     proposed["sensors"] = next_sens
 
-    if not cycle_changed and not op_changed:
+    llm_changed = False
+    if is_llm_enabled():
+        assistant_mode = "llm_enabled"
+        try:
+            llm_patch = propose_scenario_patch(
+                scenario_prompt=scenario_prompt,
+                base_payload=base_payload,
+                constraints=cfg,
+            )
+            llm_model_used = llm_patch.get("llm_model_used")
+            llm_changed = _apply_llm_patch(
+                llm_patch=llm_patch,
+                proposed=proposed,
+                cfg=cfg,
+                assumptions=assumptions,
+                safety_notes=safety_notes,
+            )
+        except LLMClientError as e:
+            assistant_mode = "rules_only"
+            service_status = "fallback"
+            safety_notes.append(f"LLM unavailable, deterministic fallback used: {e}")
+
+    if not cycle_changed and not op_changed and not llm_changed:
         safety_notes.append("Prompt was ambiguous; no change applied.")
-        assumptions.append("No deterministic scenario rule matched the prompt.")
+        assumptions.append("No deterministic/LLM scenario rule matched the prompt.")
 
     changes = _diff_payload(base_payload, proposed)
     if not changes:
@@ -178,8 +277,9 @@ def propose_scenario(
         "change_summary": changes,
         "assumptions": assumptions,
         "safety_notes": safety_notes,
-        "service_status": "ok",
-        "assistant_mode": "rules_only",
+        "service_status": service_status,
+        "assistant_mode": assistant_mode,
+        "llm_model_used": llm_model_used,
     }
 
 
@@ -198,4 +298,3 @@ def compare_decisions(base_result: Dict[str, Any], scenario_result: Dict[str, An
         "baseline_recommendation": base_result.get("recommendation_text", ""),
         "scenario_recommendation": scenario_result.get("recommendation_text", ""),
     }
-
