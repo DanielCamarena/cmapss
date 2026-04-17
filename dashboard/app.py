@@ -11,10 +11,9 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
+from dashboard.backend_adapter import run_prediction_with_adapter
 from dashboard.components import render_history_chart, render_kpis, render_result_detail
 from dashboard.mock.service import ValidationError
-
-from src.agent_layer.orchestrator import orchestrate_prediction
 
 
 DATASET_UNIT_LIMITS = {
@@ -145,7 +144,7 @@ def run_prediction(payload: Dict[str, Any]) -> None:
     try:
         st.session_state["app_status"] = "loading"
         with st.spinner("Running mock inference..."):
-            result = orchestrate_prediction(payload)
+            result = run_prediction_with_adapter(payload)
         st.session_state["last_payload"] = payload
         st.session_state["last_result"] = result
         st.session_state["history"] = result.get("history", [])

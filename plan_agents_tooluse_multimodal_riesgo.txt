@@ -1,45 +1,56 @@
-PLAN DE TRABAJO - CAPA "AGENTS, TOOL USE Y MULTIMODAL EXTRACTION"
+PLAN DE TRABAJO - CAPA "AGENTS, TOOL USE Y MULTIMODAL EXTRACTION" (V1 MEJORADA)
 ENFOQUE: LOGICA DE RIESGO Y RECOMENDACIONES (PHM C-MAPSS)
 
 Objetivo general
-- Diseñar e implementar una capa inteligente que convierta señales de degradacion en:
+- Disenar e implementar una capa inteligente que convierta senales de degradacion en:
   1) nivel de riesgo interpretable
   2) recomendacion operativa accionable
   3) trazabilidad de por que se emitio esa recomendacion
+- Mantener desacople de capas para que el dashboard (capa 3) siga operativo con payloads mock.
+
+Principio de arquitectura (contract-first)
+- Las capas se desarrollan de forma independiente.
+- Lo critico son los contratos entre capas, no la implementacion interna.
+- Capa 3 debe consumir contrato estable aunque capa 2 evolucione internamente (reglas, LLM o hibrido).
 
 Contexto
-- Esta capa se apoya en la salida del modelo RUL (real o mock) y en metadatos operativos.
-- Debe integrarse con el dashboard sin romper el contrato UI actual.
+- Capa 1: pronostico RUL (modelo predictivo)
+- Capa 2: agents + tool use + multimodal (riesgo y recomendaciones)
+- Capa 3: dashboard (front)
 
-Entradas de la capa
-- Prediccion RUL: rul_pred
-- Banda de confianza: confidence_band
-- Contexto operacional: dataset_id, unit_id, cycle, op_settings, sensores clave
-- Evidencia adicional multimodal (opcional): reportes PDF, notas tecnicas, capturas, tablas
+Contrato de entrada de capa 2
+- rul_pred
+- confidence_band
+- dataset_id, unit_id, cycle
+- op_settings (3), sensors (21), source
+- history (opcional)
 
-Salidas de la capa
-- risk_level: healthy / warning / critical
-- risk_score: 0-100
-- recommendation_text: accion concreta
-- recommendation_priority: low / medium / high / urgent
-- rationale: reglas/evidencias que activaron la recomendacion
-- audit_record_id: identificador de trazabilidad
+Contrato de salida de capa 2
+- risk_level
+- risk_score
+- recommendation_text
+- recommendation_priority
+- recommendation_alternatives
+- rationale
+- audit_record_id
+- evidence_summary
+- service_status (ok/degraded/fallback)
 
 Precondiciones
 1) Entorno activo:
    conda activate cmapss
-2) Estructuras base creadas:
+2) Estructuras base:
    src/agent_layer/
    out/agent_layer/
-3) Contratos de dashboard disponibles (input/output actuales del mock)
+3) Contratos de dashboard disponibles y versionados.
 
-FASE 1 - Definicion de contrato y gobernanza de decisiones
+FASE 1 - Contrato y gobernanza de decisiones
 Objetivo
 - Formalizar I/O y criterios de seguridad antes de automatizar recomendaciones.
 
 Tareas
-1) Definir schema de entrada unificado para la capa de riesgo.
-2) Definir schema de salida con campos de recomendacion y trazabilidad.
+1) Definir schema de entrada y salida (v1).
+2) Versionar contratos y ejemplos validos/invalidos.
 3) Definir politicas de decision:
    - nunca ocultar incertidumbre
    - no emitir acciones de alto impacto sin evidencia minima
@@ -47,7 +58,9 @@ Tareas
 4) Definir catalogo inicial de recomendaciones y severidad.
 
 Entregables
-- out/agent_layer/01_risk_io_schema.json
+- out/agent_layer/01_input_contract_v1.json
+- out/agent_layer/01_output_contract_v1.json
+- out/agent_layer/01_contract_examples.json
 - out/agent_layer/01_policy_rules.txt
 - out/agent_layer/01_recommendation_catalog.csv
 
@@ -63,7 +76,7 @@ Tareas
    - RUL estimado
    - ancho de confidence band
    - tendencia reciente de degradacion
-   - consistencia entre señales
+   - consistencia entre senales
 2) Definir mapeo score -> risk_level.
 3) Agregar reglas hard-stop:
    - critical inmediato si RUL debajo de umbral extremo
@@ -92,11 +105,13 @@ Tareas
 3) Definir fallback si alguna herramienta falla:
    - continuar con reglas base
    - marcar salida con bandera de degradacion de servicio
+4) Registrar auditoria de cada inferencia.
 
 Entregables
 - src/agent_layer/orchestrator.py
 - src/agent_layer/tools.py
 - out/agent_layer/03_toolchain_contracts.txt
+- out/agent_layer/audit_log.jsonl
 
 Criterio de salida
 - Orquestacion estable con degradacion controlada.
@@ -120,9 +135,10 @@ Entregables
 - src/agent_layer/multimodal_extractor.py
 - out/agent_layer/04_evidence_schema.json
 - out/agent_layer/04_extraction_rules.txt
+- out/agent_layer/04_tool_interfaces.txt
 
 Criterio de salida
-- Evidencia multimodal integrada en la salida sin romper I/O principal.
+- Evidencia multimodal integrada sin romper el contrato v1.
 
 FASE 5 - Generacion de recomendaciones accionables
 Objetivo
@@ -151,23 +167,51 @@ Objetivo
 
 Tareas
 1) Extender payload consumido por dashboard:
-   risk_score, priority, rationale, audit_record_id.
-2) Actualizar pestaña Recomendaciones con:
+   risk_score, priority, rationale, audit_record_id, service_status.
+2) Actualizar pestana Recomendaciones con:
    - accion principal
    - alternativas
    - evidencias clave
-3) Guardar auditoria por prediccion en out/agent_layer/audit_log.jsonl.
-4) Agregar vista de "por que esta decision".
+3) Agregar vista de "por que esta decision".
+4) Verificar compatibilidad con mocks de prueba.
 
 Entregables
 - out/agent_layer/06_dashboard_mapping.txt
-- out/agent_layer/audit_log.jsonl (formato definido)
 - out/agent_layer/06_explainability_checklist.txt
+- out/dashboard/contract_integration_checklist.txt
 
 Criterio de salida
-- Dashboard comunica riesgo + recomendacion + explicacion.
+- Dashboard comunica riesgo + recomendacion + explicacion con contrato estable.
 
-FASE 7 - Validacion y hardening
+FASE 7 - Uso de LLM real (decision e incorporacion controlada)
+Objetivo
+- Definir donde conviene usar LLM real sin comprometer control, costo ni seguridad.
+
+Tareas
+1) Evaluar opciones de motor interno:
+   - reglas + score (deterministico)
+   - reglas + LLM (hibrido recomendado)
+   - LLM dominante con guardrails
+2) Definir tareas candidatas para LLM:
+   - redaccion de recommendation_text
+   - enriquecimiento de rationale
+   - resumen ejecutivo de evidencia
+3) Definir configuracion operacional:
+   - proveedor/modelo
+   - manejo de secretos (ejemplo: GEMINI_API_KEY en entorno local y Streamlit Cloud)
+   - politicas de timeout/reintento/limite de costo
+4) Definir fallback obligatorio:
+   - si LLM falla, responder con reglas base y service_status=fallback.
+
+Entregables
+- out/agent_layer/07_engine_decision_record.txt
+- out/agent_layer/07_llm_integration_policy.txt
+- out/agent_layer/07_nonfunctional_requirements.txt
+
+Criterio de salida
+- LLM incorporado solo donde agrega valor, sin romper contrato ni operacion.
+
+FASE 8 - Validacion y hardening
 Objetivo
 - Probar seguridad, consistencia y utilidad de la capa.
 
@@ -176,18 +220,18 @@ Tareas
    healthy, warning, critical.
 2) Casos adversos:
    input incompleto, ruido extremo, conflicto entre fuentes.
-3) Evaluar estabilidad de recomendaciones entre corridas.
+3) Pruebas de contrato y regresion UI.
 4) Definir criterios Go/No-Go para produccion interna.
 
 Entregables
-- out/agent_layer/07_test_matrix.txt
-- out/agent_layer/07_failure_modes.txt
-- out/agent_layer/07_acceptance_criteria.txt
+- out/agent_layer/08_test_matrix.txt
+- out/agent_layer/08_failure_modes.txt
+- out/agent_layer/08_acceptance_criteria.txt
 
 Criterio de salida
 - Capa validada para operar como componente de decision en la app.
 
-Orden recomendado de ejecucion
+Orden recomendado
 1) Fase 1
 2) Fase 2
 3) Fase 3
@@ -195,36 +239,15 @@ Orden recomendado de ejecucion
 5) Fase 5
 6) Fase 6
 7) Fase 7
+8) Fase 8
 
 Tiempo estimado (1-2 personas)
-- Fase 1-2: 2-3 dias
-- Fase 3-5: 3-5 dias
-- Fase 6-7: 2-3 dias
-- Total: 7-11 dias
+- Fase 1-3: 3-5 dias
+- Fase 4-6: 3-5 dias
+- Fase 7-8: 2-4 dias
+- Total: 8-14 dias
 
 Definicion de exito
-- La app no solo predice RUL; tambien decide riesgo y recomienda acciones con trazabilidad.
-- La capa de agentes funciona con o sin evidencia multimodal adicional.
-- El usuario final puede entender y auditar cada recomendacion emitida.
-
-ACTUALIZACION DE INTEGRACION CON DASHBOARD MOCK (V1 IMPLEMENTADA)
-- Integracion objetivo: dashboard consume salida de `src/agent_layer/orchestrator.py`.
-- Contrato extendido ya definido para UI:
-  - rul_pred
-  - confidence_band
-  - risk_level
-  - risk_score
-  - recommendation_text
-  - recommendation_priority
-  - recommendation_alternatives
-  - rationale
-  - audit_record_id
-  - evidence_summary
-- Auditoria: cada inferencia debe persistir un registro en:
-  - out/agent_layer/audit_log.jsonl
-- Modo multimodal actual:
-  - extractor en modo `stub` (no bloquea flujo principal)
-  - evidencia resumida en `evidence_summary`
-- Resultado esperado de la V1:
-  - dashboard operativo como front de la capa de agentes,
-  - con riesgo/recomendacion explicables y trazables, aun sin extraccion multimodal completa.
+- La app no solo predice RUL: tambien decide riesgo y recomienda acciones con trazabilidad.
+- Capa 3 permanece estable aunque capa 2 evolucione internamente.
+- LLM real se usa de forma selectiva, con fallback seguro y control operacional.
